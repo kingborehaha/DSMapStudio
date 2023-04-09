@@ -1089,7 +1089,7 @@ namespace StudioCore.ParamEditor
                     ImGui.End();
                 }
             }
-            if (CFG.Current.UI_CompactParam)
+            if (CFG.Current.UI_CompactParams)
             {
                 ImGui.PopStyleVar(2);
             }
