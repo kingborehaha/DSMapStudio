@@ -260,7 +260,23 @@ namespace StudioCore.MsbEditor
             var action = new CompoundAction(actlist);
             EditorActionManager.ExecuteAction(action);
         }
-        
+
+        public void ToggleShowModelMarkersForEverything()
+        {
+            CFG.Current.Map_ShowModelMarkersForEverything = !CFG.Current.Map_ShowModelMarkersForEverything;
+
+            foreach (var map in Universe.LoadedObjectContainers)
+            {
+                if (map.Value != null)
+                {
+                    foreach (var ent in map.Value.Objects)
+                    {
+                        ent.UpdateRenderModel();
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// Hides all the selected objects, unless all of them are hidden in which
         /// they will be unhidden
@@ -778,6 +794,10 @@ namespace StudioCore.MsbEditor
                     Viewport.SceneParamsGui();
                     ImGui.EndMenu();
                 }
+                if (ImGui.MenuItem("Show model markers for everything", KeyBindings.Current.Map_ShowModelMarkersForEverything.HintText, CFG.Current.Map_ShowModelMarkersForEverything))
+                {
+                    ToggleShowModelMarkersForEverything();
+                }
                 CFG.Current.LastSceneFilter = RenderScene.DrawFilter;
                 ImGui.EndMenu();
             }
@@ -935,6 +955,10 @@ namespace StudioCore.MsbEditor
                 if (InputTracker.GetKeyDown(KeyBindings.Current.Map_MoveSelectionToCamera) && _selection.IsSelection())
                 {
                     MoveSelectionToCamera();
+                }
+                if (InputTracker.GetKeyDown(KeyBindings.Current.Map_ShowModelMarkersForEverything))
+                {
+                    ToggleShowModelMarkersForEverything();
                 }
 
                 if (AssetLocator.Type is GameType.EldenRing)

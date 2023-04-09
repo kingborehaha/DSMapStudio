@@ -164,6 +164,7 @@ namespace StudioCore.Scene
 
         private ModelMarkerType _placeholderType;
         private RenderableProxy? _placeholderProxy = null;
+        private bool _showPlaceholderProxy;
 
         private int _renderable = -1;
         private int _selectionOutlineRenderable = -1;
@@ -246,7 +247,14 @@ namespace StudioCore.Scene
 
                 if (_placeholderProxy != null)
                 {
-                    _placeholderProxy.Visible = _visible;
+                    if (_showPlaceholderProxy || CFG.Current.Map_ShowModelMarkersForEverything)
+                    {
+                        _placeholderProxy.Visible = _visible;
+                    }
+                    else
+                    {
+                        _placeholderProxy.Visible = false;
+                    }
                 }
             }
         }
@@ -358,11 +366,36 @@ namespace StudioCore.Scene
             _renderablesSet = renderables;
             _meshProvider = provider;
             _placeholderType = placeholderType;
+            _showPlaceholderProxy = _placeholderType != ModelMarkerType.None;
             _meshProvider.AddEventListener(this);
             _meshProvider.Acquire();
             if (autoregister)
             {
                 ScheduleRenderableConstruction();
+            }
+
+            // Default placeholderProxy
+            if (_placeholderType != ModelMarkerType.None)
+            {
+                _placeholderProxy =
+                    DebugPrimitiveRenderableProxy.GetModelMarkerProxy(_renderablesSet, _placeholderType);
+                _placeholderProxy.World = World;
+                _placeholderProxy.Visible = _visible;
+                _placeholderProxy.DrawFilter = _drawfilter;
+                _placeholderProxy.DrawGroups = _drawgroups;
+                if (_selectable != null)
+                {
+                    _selectable.TryGetTarget(out var sel);
+                    if (sel != null)
+                    {
+                        _placeholderProxy.SetSelectable(sel);
+                    }
+                }
+
+                if (_registered)
+                {
+                    _placeholderProxy.Register();
+                }
             }
         }
 
@@ -412,7 +445,11 @@ namespace StudioCore.Scene
                 c.UnregisterAndRelease();
             }
 
-            _placeholderProxy?.UnregisterAndRelease();
+            if (_placeholderProxy != null)
+            {
+                _placeholderProxy.UnregisterAndRelease();
+                _placeholderProxy = null;
+            }
 
             if (_meshProvider != null)
             {
@@ -723,7 +760,7 @@ namespace StudioCore.Scene
 
         public void OnProviderAvailable()
         {
-            bool needsPlaceholder = _placeholderType != ModelMarkerType.None;
+            _showPlaceholderProxy = _placeholderType != ModelMarkerType.None;
             for (int i = 0; i < _meshProvider.ChildCount; i++)
             {
                 var child = new MeshRenderableProxy(_renderablesSet, _meshProvider.GetChildProvider(i),
@@ -745,7 +782,7 @@ namespace StudioCore.Scene
 
                 if (child._meshProvider != null && child._meshProvider.IsAvailable() && child._meshProvider.IndexCount > 0)
                 {
-                    needsPlaceholder = false;
+                    _showPlaceholderProxy = false;
                 }
             }
 
@@ -754,31 +791,13 @@ namespace StudioCore.Scene
                 ScheduleRenderableConstruction();
                 if (_meshProvider != null && _meshProvider.IndexCount > 0)
                 {
-                    needsPlaceholder = false;
+                    _showPlaceholderProxy = false;
                 }
             }
 
-            if (needsPlaceholder)
+            if (!_showPlaceholderProxy && _placeholderProxy != null)
             {
-                _placeholderProxy =
-                    DebugPrimitiveRenderableProxy.GetModelMarkerProxy(_renderablesSet, _placeholderType);
-                _placeholderProxy.World = World;
-                _placeholderProxy.Visible = Visible;
-                _placeholderProxy.DrawFilter = _drawfilter;
-                _placeholderProxy.DrawGroups = _drawgroups;
-                if (_selectable != null)
-                {
-                    _selectable.TryGetTarget(out var sel);
-                    if (sel != null)
-                    {
-                        _placeholderProxy.SetSelectable(sel);
-                    }
-                }
-
-                if (_registered)
-                {
-                    _placeholderProxy.Register();
-                }
+                _placeholderProxy.Visible = false;
             }
         }
 
