@@ -363,6 +363,8 @@ namespace StudioCore
                 }
                 ImGui.Checkbox("Disable row grouping", ref CFG.Current.Param_DisableRowGrouping);
 
+                ImGui.Checkbox("Compact params in UI", ref CFG.Current.UI_CompactParams);
+
                 ImGui.Unindent();
                 ImGui.EndTabItem();
             }

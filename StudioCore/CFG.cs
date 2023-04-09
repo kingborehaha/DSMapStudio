@@ -221,7 +221,10 @@ namespace StudioCore
         public bool FontThai = false;
         public bool FontVietnamese = false;
         public bool FontCyrillic = false;
+
+        // UI settings
         public float UIScale = 1.0f;
+        public bool UI_CompactParams = false;
 
         // FMG Editor settings
         public bool FMG_ShowOriginalNames = false;

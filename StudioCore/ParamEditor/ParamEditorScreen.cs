@@ -1047,7 +1047,7 @@ namespace StudioCore.ParamEditor
             ShortcutPopups();
             MassEditPopups();
 
-            if (false) // CFG.Current.UI_CompactParams
+            if (CFG.Current.UI_CompactParams)
             {
                 ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(1.0f, 1.0f) * scale);
                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(5.0f, 1.0f) * scale);
@@ -1089,7 +1089,7 @@ namespace StudioCore.ParamEditor
                     ImGui.End();
                 }
             }
-            if (false) // CFG.Current.UI_CompactParams)
+            if (CFG.Current.UI_CompactParam)
             {
                 ImGui.PopStyleVar(2);
             }
