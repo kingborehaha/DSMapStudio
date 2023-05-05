@@ -12,6 +12,8 @@ using Veldrid;
 using Veldrid.Sdl2;
 using Veldrid.Utilities;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace StudioCore.MsbEditor
 {
@@ -313,6 +315,21 @@ namespace StudioCore.MsbEditor
             EditorActionManager.ExecuteAction(act);
         }
 
+        /// <summary>
+        /// Adds a new entity to the targeted map. If no parent is specified, RootObject will be used.
+        /// </summary>
+        private MapEntity AddNewEntityAndReturnEntity(Type typ, MapEntity.MapEntityType etype, Map map, Entity parent = null)
+        {
+            var newent = typ.GetConstructor(Type.EmptyTypes).Invoke(new object[0]);
+            var obj = new MapEntity(map, newent, etype);
+
+            parent ??= map.RootObject;
+
+            var act = new AddMapObjectsAction(Universe, map, RenderScene, new List<MapEntity> { obj }, false, parent);
+            EditorActionManager.ExecuteAction(act);
+            return obj;
+        }
+
         private void DummySelection()
         {
             string[] sourceTypes = { "Enemy", "Object", "Asset" };
@@ -423,59 +440,205 @@ namespace StudioCore.MsbEditor
             }
         }
 
+        private void SortGrid()
+        {
+            float spacing_X = 5.0f;
+            float spacing_Z = 5.0f;
+
+            var map = Universe.GetLoadedMap("m60_57_55_00");
+            map ??= Universe.GetLoadedMap("m60_57_56_00");
+            map ??= Universe.GetLoadedMap("m60_57_57_00");
+            map ??= Universe.GetLoadedMap("m60_57_58_00");
+            map ??= Universe.GetLoadedMap("m60_57_59_00");
+            map ??= Universe.GetLoadedMap("m60_57_60_00");
+            map ??= Universe.GetLoadedMap("m60_57_61_00");
+            {
+                Dictionary<string, (MapEntity, MSBE.Part.Asset, BoundingBox, Vector3)> aegDict = new();
+
+                float totalXLength = 0.0f;
+                float pos_X_next = 0;
+                float pos_Z_next = 0;
+                float pos_Z_cap = 0;
+
+                foreach (var mapObj in map.Objects)
+                {
+                    if (mapObj.WrappedObject is MSBE.Part.Asset asset)
+                    {
+                        var bb = mapObj.RenderSceneMesh.GetBounds();
+                        var bbDimensions = bb.GetDimensions();
+                        aegDict[asset.ModelName] = ((MapEntity)mapObj, asset, bb, bbDimensions);
+
+                        //totalXLength += spacing_X + bbDimensions.X * 0.25f;
+                    }
+                }
+
+                //float pos_X_rowThreshold = (totalXLength / row_num);
+
+                foreach (var tuple in aegDict.OrderBy(e => e.Value.Item4.X + e.Value.Item4.Y + e.Value.Item4.Z))
+                {
+                    var ent = tuple.Value.Item1;
+                    var asset = tuple.Value.Item2;
+                    var bb = tuple.Value.Item3;
+                    var bbDimensions = tuple.Value.Item4;
+
+                    var relativeCenter = bb.GetCenter() - asset.Position;
+
+                    var spacing_dim = bbDimensions.X * 0.25f + bbDimensions.Y * 0.25f + bbDimensions.Z * 0.25f;
+
+                    totalXLength += bbDimensions.X + spacing_X + spacing_dim;
+                    //if (totalXLength > pos_X_rowThreshold)
+                    if (totalXLength > aeg_grid_xPosRowThreshold)
+                    {
+                        totalXLength = 0;
+                        pos_X_next = 0;
+                        pos_Z_next = pos_Z_cap + spacing_Z + spacing_dim;
+                    }
+
+                    pos_X_next += (bbDimensions.X * 0.5f) - relativeCenter.X;
+
+                    var pos_X = pos_X_next;
+                    var pos_Y = -relativeCenter.Y;
+                    var pos_Z = pos_Z_next + (bbDimensions.Z * 0.5f) - relativeCenter.Z; //yes
+                    pos_Z = pos_Z_next + (bbDimensions.Z * 0.5f) - relativeCenter.Z;
+                    //var pos_Z = pos_Z_next - center.Z; // centered (no)
+
+                    asset.Position = new Vector3(pos_X, pos_Y, pos_Z);
+
+                    pos_X_next += (bbDimensions.X * 0.5f) + relativeCenter.X;
+
+                    pos_X_next += spacing_X + spacing_dim; // Additional spacing
+
+                    if (pos_Z_cap + spacing_Z + spacing_dim < pos_Z_next + bbDimensions.Z + spacing_dim)
+                        pos_Z_cap = pos_Z_next + bbDimensions.Z + spacing_dim;
+
+                    ent.UpdateRenderModel();
+                }
+            }
+        }
+
+        private void GenerateGrid()
+        {
+            var map = Universe.GetLoadedMap("m60_57_55_00");
+            map ??= Universe.GetLoadedMap("m60_57_56_00");
+            map ??= Universe.GetLoadedMap("m60_57_57_00");
+            map ??= Universe.GetLoadedMap("m60_57_58_00");
+            map ??= Universe.GetLoadedMap("m60_57_59_00");
+            map ??= Universe.GetLoadedMap("m60_57_60_00");
+            map ??= Universe.GetLoadedMap("m60_57_61_00");
+            /*
+            aeg_min = 0;
+            aeg_max = 5;
+            if (map == null)
+            {
+                map = Universe.GetLoadedMap("m60_57_56_00");
+                aeg_min = 11;
+                aeg_max = 20;
+            }
+            if (map == null)
+            {
+                map = Universe.GetLoadedMap("m60_57_57_00");
+                aeg_min = 20;
+                aeg_max = 22;
+            }
+            if (map == null)
+            {
+                map = Universe.GetLoadedMap("m60_57_58_00");
+                aeg_min = 23;
+                aeg_max = 24;
+            }
+            if (map == null)
+            {
+                map = Universe.GetLoadedMap("m60_57_59_00");
+                aeg_min = 26;
+                aeg_max = 110;
+            }
+            if (map == null)
+            {
+                map = Universe.GetLoadedMap("m60_57_60_00");
+                aeg_min = 200;
+                aeg_max = 229;
+            }
+            if (map == null)
+            {
+                map = Universe.GetLoadedMap("m60_57_61_00");
+                aeg_min = 230;
+                aeg_max = 999;
+            }
+            */
+            {
+                if (map.Objects.Count > 0)
+                {
+                    List<MapEntity> ogMapEnts = new();
+                    foreach (var obj in map.Objects)
+                    {
+                        if (obj is MapEntity me)
+                            ogMapEnts.Add(me);
+                    }
+                    var action = new DeleteMapObjectsAction(Universe, RenderScene, ogMapEnts, false);
+                    EditorActionManager.ExecuteAction(action);
+                }
+
+                Dictionary<string, List<string>> aegDict = new();
+                foreach (var folder in Directory.GetDirectories($@"{AssetLocator.GameRootDirectory}\asset\aeg"))
+                {
+                    var folderName = Path.GetFileNameWithoutExtension(folder);
+
+                    var aegNum = int.Parse(folderName.Replace("aeg", ""));
+                    if (aegNum < aeg_grid_aegNumMin || aegNum > aeg_grid_aegNumMax)
+                    {
+                        // Not within aeg range for this map, skip.
+                        continue;
+                    }
+
+                    aegDict[folderName] = new();
+                    List<string> list = aegDict[folderName];
+
+                    foreach (var path in Directory.GetFiles(folder, "*.geombnd.dcx"))
+                    {
+                        var fileName = Path.GetFileNameWithoutExtension(path).Replace(".geombnd", "");
+                        if (fileName.Contains("_l") || fileName.Contains("_h"))
+                        {
+                            continue;
+                        }
+                        list.Add(fileName.ToUpper());
+                    }
+                }
+
+                foreach (var aegKVP in aegDict)
+                {
+                    var aegFolderName = aegKVP.Key;
+                    var modelNameList = aegKVP.Value;
+                    foreach (var modelName in modelNameList)
+                    {
+                        MapEntity ent = AddNewEntityAndReturnEntity(typeof(MSBE.Part.Asset), MapEntity.MapEntityType.Part, map);
+                        var asset = (MSBE.Part.Asset)ent.WrappedObject;
+                        asset.ModelName = modelName;
+                        asset.Name = modelName;
+                        ent.UpdateRenderModel();
+                    }
+                }
+            }
+        }
+
+        private int aeg_grid_aegNumMin = 0;
+        private int aeg_grid_aegNumMax = 5;
+        private float aeg_grid_xPosRowThreshold = 1000.0f;
         public override void DrawEditorMenu()
         {
-            if (ImGui.Button("gen grid"))
+            if (ImGui.BeginMenu("Asset grid generator"))
             {
-                Vector3 pos = Vector3.Zero;
-                var map = Universe.GetLoadedMap("m69_69_00_00");
-                if (map == null)
+                ImGui.InputInt("AEG min", ref aeg_grid_aegNumMin);
+                ImGui.InputInt("AEG max", ref aeg_grid_aegNumMax);
+                if (ImGui.Button("Generate"))
                 {
-                    System.Diagnostics.Debugger.Break();
+                    GenerateGrid();
                 }
-                else
+                ImGui.DragFloat("New row distance threshold", ref aeg_grid_xPosRowThreshold);
+                if (ImGui.Button("Sort"))
                 {
-                    map.Objects.Clear();
-
-                    Dictionary<string, List<string>> aegDict = new();
-                    foreach (var folder in Directory.GetDirectories($@"{AssetLocator.GameRootDirectory}\asset\aeg"))
-                    {
-                        var folderName = Path.GetFileNameWithoutExtension(folder);
-                        List<string> list = aegDict[folderName];
-                        list = new();
-                        foreach (var path in Directory.GetFiles(folder, "*.geombnd.dcx"))
-                        {
-                            var fileName = Path.GetFileNameWithoutExtension(path);
-                            if (fileName.Contains("_l") || fileName.Contains("_h"))
-                            {
-                                continue;
-                            }
-                            list.Add(fileName);
-                        }
-                    }
-
-                    foreach (var aegKVP in aegDict)
-                    {
-                        var aegFolderName = aegKVP.Key;
-                        var modelNameList = aegKVP.Value;
-                        foreach (var modelName in modelNameList)
-                        {
-                            MSBE.Part.Asset asset = new();
-                            asset.ModelName = modelName;
-                            asset.Name = modelName;
-                            MapEntity ent = new(map, asset);
-                            map.AddObject(ent);
-
-
-                            //probably need to wait for mesh to load, yeah?
-                            var bounds = ent.RenderSceneMesh.GetBounds();
-
-
-
-                        }
-                    }
-
+                    SortGrid();
                 }
+                ImGui.EndMenu();
             }
             if (ImGui.BeginMenu("Edit"))
             {
