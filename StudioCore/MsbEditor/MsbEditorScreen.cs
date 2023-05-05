@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using Veldrid;
 using Veldrid.Sdl2;
 using Veldrid.Utilities;
+using System.IO;
 
 namespace StudioCore.MsbEditor
 {
@@ -424,6 +425,58 @@ namespace StudioCore.MsbEditor
 
         public override void DrawEditorMenu()
         {
+            if (ImGui.Button("gen grid"))
+            {
+                Vector3 pos = Vector3.Zero;
+                var map = Universe.GetLoadedMap("m69_69_00_00");
+                if (map == null)
+                {
+                    System.Diagnostics.Debugger.Break();
+                }
+                else
+                {
+                    map.Objects.Clear();
+
+                    Dictionary<string, List<string>> aegDict = new();
+                    foreach (var folder in Directory.GetDirectories($@"{AssetLocator.GameRootDirectory}\asset\aeg"))
+                    {
+                        var folderName = Path.GetFileNameWithoutExtension(folder);
+                        List<string> list = aegDict[folderName];
+                        list = new();
+                        foreach (var path in Directory.GetFiles(folder, "*.geombnd.dcx"))
+                        {
+                            var fileName = Path.GetFileNameWithoutExtension(path);
+                            if (fileName.Contains("_l") || fileName.Contains("_h"))
+                            {
+                                continue;
+                            }
+                            list.Add(fileName);
+                        }
+                    }
+
+                    foreach (var aegKVP in aegDict)
+                    {
+                        var aegFolderName = aegKVP.Key;
+                        var modelNameList = aegKVP.Value;
+                        foreach (var modelName in modelNameList)
+                        {
+                            MSBE.Part.Asset asset = new();
+                            asset.ModelName = modelName;
+                            asset.Name = modelName;
+                            MapEntity ent = new(map, asset);
+                            map.AddObject(ent);
+
+
+                            //probably need to wait for mesh to load, yeah?
+                            var bounds = ent.RenderSceneMesh.GetBounds();
+
+
+
+                        }
+                    }
+
+                }
+            }
             if (ImGui.BeginMenu("Edit"))
             {
                 if (ImGui.MenuItem("Undo", KeyBindings.Current.Core_Undo.HintText, false, EditorActionManager.CanUndo()))
