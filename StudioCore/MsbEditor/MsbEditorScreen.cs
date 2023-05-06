@@ -445,86 +445,113 @@ namespace StudioCore.MsbEditor
             float spacing_X = 5.0f;
             float spacing_Z = 5.0f;
 
-            var map = Universe.GetLoadedMap("m60_57_55_00");
-            map ??= Universe.GetLoadedMap("m60_57_56_00");
-            map ??= Universe.GetLoadedMap("m60_57_57_00");
-            map ??= Universe.GetLoadedMap("m60_57_58_00");
-            map ??= Universe.GetLoadedMap("m60_57_59_00");
-            map ??= Universe.GetLoadedMap("m60_57_60_00");
-            map ??= Universe.GetLoadedMap("m60_57_61_00");
+            Map? map = null;
+            foreach (var m in Universe.LoadedObjectContainers)
             {
-                Dictionary<string, (MapEntity, MSBE.Part.Asset, BoundingBox, Vector3)> aegDict = new();
-
-                float totalXLength = 0.0f;
-                float pos_X_next = 0;
-                float pos_Z_next = 0;
-                float pos_Z_cap = 0;
-
-                foreach (var mapObj in map.Objects)
+                if (m.Value != null)
                 {
-                    if (mapObj.WrappedObject is MSBE.Part.Asset asset)
-                    {
-                        var bb = mapObj.RenderSceneMesh.GetBounds();
-                        var bbDimensions = bb.GetDimensions();
-                        aegDict[asset.ModelName] = ((MapEntity)mapObj, asset, bb, bbDimensions);
-
-                        //totalXLength += spacing_X + bbDimensions.X * 0.25f;
-                    }
+                    map = (Map)m.Value;
+                    break;
                 }
 
-                //float pos_X_rowThreshold = (totalXLength / row_num);
+            }
+            if (map == null)
+            {
+                MessageBox.Show("No maps loaded");
+                return;
+            }
 
-                foreach (var tuple in aegDict.OrderBy(e => e.Value.Item4.X + e.Value.Item4.Y + e.Value.Item4.Z))
+
+            Dictionary<string, (MapEntity, MSBE.Part.Asset, BoundingBox, Vector3)> aegDict = new();
+
+            float totalXLength = 0.0f;
+            float pos_X_next = 0;
+            float pos_Z_next = 0;
+            float pos_Z_cap = 0;
+
+            foreach (var mapObj in map.Objects)
+            {
+                if (mapObj.WrappedObject is MSBE.Part.Asset asset)
                 {
-                    var ent = tuple.Value.Item1;
-                    var asset = tuple.Value.Item2;
-                    var bb = tuple.Value.Item3;
-                    var bbDimensions = tuple.Value.Item4;
+                    var bb = mapObj.RenderSceneMesh.GetBounds();
+                    var bbDimensions = bb.GetDimensions();
+                    aegDict[asset.ModelName] = ((MapEntity)mapObj, asset, bb, bbDimensions);
 
-                    var relativeCenter = bb.GetCenter() - asset.Position;
-
-                    var spacing_dim = bbDimensions.X * 0.25f + bbDimensions.Y * 0.25f + bbDimensions.Z * 0.25f;
-
-                    totalXLength += bbDimensions.X + spacing_X + spacing_dim;
-                    //if (totalXLength > pos_X_rowThreshold)
-                    if (totalXLength > aeg_grid_xPosRowThreshold)
-                    {
-                        totalXLength = 0;
-                        pos_X_next = 0;
-                        pos_Z_next = pos_Z_cap + spacing_Z + spacing_dim;
-                    }
-
-                    pos_X_next += (bbDimensions.X * 0.5f) - relativeCenter.X;
-
-                    var pos_X = pos_X_next;
-                    var pos_Y = -relativeCenter.Y;
-                    var pos_Z = pos_Z_next + (bbDimensions.Z * 0.5f) - relativeCenter.Z; //yes
-                    pos_Z = pos_Z_next + (bbDimensions.Z * 0.5f) - relativeCenter.Z;
-                    //var pos_Z = pos_Z_next - center.Z; // centered (no)
-
-                    asset.Position = new Vector3(pos_X, pos_Y, pos_Z);
-
-                    pos_X_next += (bbDimensions.X * 0.5f) + relativeCenter.X;
-
-                    pos_X_next += spacing_X + spacing_dim; // Additional spacing
-
-                    if (pos_Z_cap + spacing_Z + spacing_dim < pos_Z_next + bbDimensions.Z + spacing_dim)
-                        pos_Z_cap = pos_Z_next + bbDimensions.Z + spacing_dim;
-
-                    ent.UpdateRenderModel();
+                    //totalXLength += spacing_X + bbDimensions.X * 0.25f;
                 }
+            }
+
+            //float pos_X_rowThreshold = (totalXLength / row_num);
+            int assetRowCounter = 0;
+            float prev_spacing_dim = 0f;
+
+            foreach (var tuple in aegDict.OrderBy(e => e.Value.Item4.X + e.Value.Item4.Y + e.Value.Item4.Z))
+            {
+
+                var ent = tuple.Value.Item1;
+                var asset = tuple.Value.Item2;
+                var bb = tuple.Value.Item3;
+                var bbDimensions = tuple.Value.Item4;
+
+                var relativeCenter = bb.GetCenter() - asset.Position;
+
+                var spacing_dim = bbDimensions.X * 0.25f + bbDimensions.Y * 0.25f + bbDimensions.Z * 0.25f;
+
+                totalXLength += bbDimensions.X + spacing_X + spacing_dim;
+
+                assetRowCounter++;
+                if (totalXLength > aeg_grid_xPosRowThreshold)
+                {
+                    if (true)// assetRowCounter > 1)
+                    {
+                        pos_Z_next = pos_Z_cap + spacing_Z + prev_spacing_dim;
+                    }
+                    else
+                    {
+                        pos_Z_next = pos_Z_cap;
+                    }
+                    assetRowCounter = 0;
+                    totalXLength = 0;
+                    pos_X_next = 0;
+                }
+                prev_spacing_dim = spacing_dim;
+
+                pos_X_next += (bbDimensions.X * 0.5f) - relativeCenter.X;
+
+                var pos_X = pos_X_next;
+                var pos_Y = -relativeCenter.Y;
+                var pos_Z = pos_Z_next + (bbDimensions.Z * 0.5f) - relativeCenter.Z; //yes
+
+                asset.Position = new Vector3(pos_X, pos_Y, pos_Z);
+
+                pos_X_next += (bbDimensions.X * 0.5f) + relativeCenter.X;
+
+                pos_X_next += spacing_X + spacing_dim; // Additional spacing
+
+                if (pos_Z_cap + spacing_Z + spacing_dim < pos_Z_next + bbDimensions.Z + spacing_dim)
+                    pos_Z_cap = pos_Z_next + bbDimensions.Z + spacing_dim;
+
+                ent.UpdateRenderModel();
             }
         }
 
         private void GenerateGrid()
         {
-            var map = Universe.GetLoadedMap("m60_57_55_00");
-            map ??= Universe.GetLoadedMap("m60_57_56_00");
-            map ??= Universe.GetLoadedMap("m60_57_57_00");
-            map ??= Universe.GetLoadedMap("m60_57_58_00");
-            map ??= Universe.GetLoadedMap("m60_57_59_00");
-            map ??= Universe.GetLoadedMap("m60_57_60_00");
-            map ??= Universe.GetLoadedMap("m60_57_61_00");
+            Map? map = null;
+            foreach (var m in Universe.LoadedObjectContainers)
+            {
+                if (m.Value != null)
+                {
+                    map = (Map)m.Value;
+                    break;
+                }
+
+            }
+            if (map == null)
+            {
+                MessageBox.Show("No maps loaded");
+                return;
+            }
             /*
             aeg_min = 0;
             aeg_max = 5;
@@ -623,17 +650,30 @@ namespace StudioCore.MsbEditor
         private int aeg_grid_aegNumMin = 0;
         private int aeg_grid_aegNumMax = 5;
         private float aeg_grid_xPosRowThreshold = 1000.0f;
+        private int aeg_grid_minAssetsPerRow = 1;
         public override void DrawEditorMenu()
         {
             if (ImGui.BeginMenu("Asset grid generator"))
             {
+                ImGui.Text("For generating a grid of assets (uses first loaded map)");
                 ImGui.InputInt("AEG min", ref aeg_grid_aegNumMin);
                 ImGui.InputInt("AEG max", ref aeg_grid_aegNumMax);
-                if (ImGui.Button("Generate"))
+                if (ImGui.Button("Populate"))
                 {
                     GenerateGrid();
                 }
-                ImGui.DragFloat("New row distance threshold", ref aeg_grid_xPosRowThreshold);
+                if (ImGui.DragFloat("Distance before starting new row", ref aeg_grid_xPosRowThreshold))
+                {
+                    if (aeg_grid_xPosRowThreshold < 1f)
+                        aeg_grid_xPosRowThreshold = 1f;
+                }
+                /*
+                if (ImGui.InputInt("Minimum assets per row", ref aeg_grid_minAssetsPerRow))
+                {
+                    if (aeg_grid_minAssetsPerRow < 1)
+                        aeg_grid_minAssetsPerRow = 1;
+                }
+                */
                 if (ImGui.Button("Sort"))
                 {
                     SortGrid();
