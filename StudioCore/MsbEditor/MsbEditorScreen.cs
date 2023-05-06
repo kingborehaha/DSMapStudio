@@ -552,97 +552,55 @@ namespace StudioCore.MsbEditor
                 MessageBox.Show("No maps loaded");
                 return;
             }
-            /*
-            aeg_min = 0;
-            aeg_max = 5;
-            if (map == null)
+            if (map.Objects.Count > 0)
             {
-                map = Universe.GetLoadedMap("m60_57_56_00");
-                aeg_min = 11;
-                aeg_max = 20;
-            }
-            if (map == null)
-            {
-                map = Universe.GetLoadedMap("m60_57_57_00");
-                aeg_min = 20;
-                aeg_max = 22;
-            }
-            if (map == null)
-            {
-                map = Universe.GetLoadedMap("m60_57_58_00");
-                aeg_min = 23;
-                aeg_max = 24;
-            }
-            if (map == null)
-            {
-                map = Universe.GetLoadedMap("m60_57_59_00");
-                aeg_min = 26;
-                aeg_max = 110;
-            }
-            if (map == null)
-            {
-                map = Universe.GetLoadedMap("m60_57_60_00");
-                aeg_min = 200;
-                aeg_max = 229;
-            }
-            if (map == null)
-            {
-                map = Universe.GetLoadedMap("m60_57_61_00");
-                aeg_min = 230;
-                aeg_max = 999;
-            }
-            */
-            {
-                if (map.Objects.Count > 0)
+                List<MapEntity> ogMapEnts = new();
+                foreach (var obj in map.Objects)
                 {
-                    List<MapEntity> ogMapEnts = new();
-                    foreach (var obj in map.Objects)
-                    {
-                        if (obj is MapEntity me)
-                            ogMapEnts.Add(me);
-                    }
-                    var action = new DeleteMapObjectsAction(Universe, RenderScene, ogMapEnts, false);
-                    EditorActionManager.ExecuteAction(action);
+                    if (obj is MapEntity me)
+                        ogMapEnts.Add(me);
+                }
+                var action = new DeleteMapObjectsAction(Universe, RenderScene, ogMapEnts, false);
+                EditorActionManager.ExecuteAction(action);
+            }
+
+            Dictionary<string, List<string>> aegDict = new();
+            foreach (var folder in Directory.GetDirectories($@"{AssetLocator.GameRootDirectory}\asset\aeg"))
+            {
+                var folderName = Path.GetFileNameWithoutExtension(folder);
+
+                var aegNum = int.Parse(folderName.Replace("aeg", ""));
+                if (aegNum < aeg_grid_aegNumMin || aegNum > aeg_grid_aegNumMax)
+                {
+                    // Not within aeg range for this map, skip.
+                    continue;
                 }
 
-                Dictionary<string, List<string>> aegDict = new();
-                foreach (var folder in Directory.GetDirectories($@"{AssetLocator.GameRootDirectory}\asset\aeg"))
-                {
-                    var folderName = Path.GetFileNameWithoutExtension(folder);
+                aegDict[folderName] = new();
+                List<string> list = aegDict[folderName];
 
-                    var aegNum = int.Parse(folderName.Replace("aeg", ""));
-                    if (aegNum < aeg_grid_aegNumMin || aegNum > aeg_grid_aegNumMax)
+                foreach (var path in Directory.GetFiles(folder, "*.geombnd.dcx"))
+                {
+                    var fileName = Path.GetFileNameWithoutExtension(path).Replace(".geombnd", "");
+                    if (fileName.Contains("_l") || fileName.Contains("_h"))
                     {
-                        // Not within aeg range for this map, skip.
                         continue;
                     }
-
-                    aegDict[folderName] = new();
-                    List<string> list = aegDict[folderName];
-
-                    foreach (var path in Directory.GetFiles(folder, "*.geombnd.dcx"))
-                    {
-                        var fileName = Path.GetFileNameWithoutExtension(path).Replace(".geombnd", "");
-                        if (fileName.Contains("_l") || fileName.Contains("_h"))
-                        {
-                            continue;
-                        }
-                        list.Add(fileName.ToUpper());
-                    }
+                    list.Add(fileName.ToUpper());
                 }
+            }
 
-                foreach (var aegKVP in aegDict)
+            foreach (var aegKVP in aegDict)
+            {
+                var aegFolderName = aegKVP.Key;
+                var modelNameList = aegKVP.Value;
+                foreach (var modelName in modelNameList)
                 {
-                    var aegFolderName = aegKVP.Key;
-                    var modelNameList = aegKVP.Value;
-                    foreach (var modelName in modelNameList)
-                    {
-                        MapEntity ent = AddNewEntityAndReturnEntity(typeof(MSBE.Part.Asset), MapEntity.MapEntityType.Part, map);
-                        var asset = (MSBE.Part.Asset)ent.WrappedObject;
-                        asset.ModelName = modelName;
-                        asset.Name = modelName;
-                        ent.UpdateRenderModel();
-                    }
+                    MapEntity ent = AddNewEntityAndReturnEntity(typeof(MSBE.Part.Asset), MapEntity.MapEntityType.Part, map);
+                    var asset = (MSBE.Part.Asset)ent.WrappedObject;
+                    asset.ModelName = modelName;
+                    asset.Name = modelName;
+                    ent.UpdateRenderModel();
                 }
             }
         }
