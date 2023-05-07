@@ -440,7 +440,7 @@ namespace StudioCore.MsbEditor
             }
         }
 
-        private void SortGrid()
+        private void SortAegGrid()
         {
             float spacing_X = 5.0f;
             float spacing_Z = 5.0f;
@@ -525,7 +525,7 @@ namespace StudioCore.MsbEditor
             }
         }
 
-        private void GenerateGrid()
+        private void PopulateAegGrid()
         {
             Map? map = null;
             foreach (var m in Universe.LoadedObjectContainers)
@@ -616,20 +616,27 @@ namespace StudioCore.MsbEditor
                 ImGui.InputText("AEG targets (Must have leading zeroes. Comma separated)", ref aeg_range_string, 999);
                 if (ImGui.Button("Populate map with assets"))
                 {
-                    GenerateGrid();
+                    try
+                    {
+                        PopulateAegGrid();
+                    }
+                    catch(Exception e)
+                    {
+                        MessageBox.Show($"AEG grid population failed\n{e.Message}", "Error");
+                    }
                 }
 
                 ImGui.NewLine();
 
-                ImGui.Text("Sorting: Choose grid row distance, then sort map.");
+                ImGui.Text("Sorting: Wait for assets to be visibly loaded, then sort map.");
                 if (ImGui.DragFloat("Distance before starting new row", ref aeg_grid_xPosRowThreshold))
                 {
                     if (aeg_grid_xPosRowThreshold < 1f)
                         aeg_grid_xPosRowThreshold = 1f;
                 }
-                if (ImGui.Button("Sort assets as grid"))
+                if (ImGui.Button("Sort assets into grid"))
                 {
-                    SortGrid();
+                    SortAegGrid();
                 }
                 ImGui.EndMenu();
             }
