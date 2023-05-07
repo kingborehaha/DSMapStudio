@@ -476,12 +476,9 @@ namespace StudioCore.MsbEditor
                     var bb = mapObj.RenderSceneMesh.GetBounds();
                     var bbDimensions = bb.GetDimensions();
                     aegDict[asset.ModelName] = ((MapEntity)mapObj, asset, bb, bbDimensions);
-
-                    //totalXLength += spacing_X + bbDimensions.X * 0.25f;
                 }
             }
 
-            //float pos_X_rowThreshold = (totalXLength / row_num);
             int assetRowCounter = 0;
             float prev_spacing_dim = 0f;
 
@@ -502,14 +499,7 @@ namespace StudioCore.MsbEditor
                 assetRowCounter++;
                 if (totalXLength > aeg_grid_xPosRowThreshold)
                 {
-                    if (true)// assetRowCounter > 1)
-                    {
-                        pos_Z_next = pos_Z_cap + spacing_Z + prev_spacing_dim;
-                    }
-                    else
-                    {
-                        pos_Z_next = pos_Z_cap;
-                    }
+                    pos_Z_next = pos_Z_cap + spacing_Z + prev_spacing_dim;
                     assetRowCounter = 0;
                     totalXLength = 0;
                     pos_X_next = 0;
@@ -520,7 +510,7 @@ namespace StudioCore.MsbEditor
 
                 var pos_X = pos_X_next;
                 var pos_Y = -relativeCenter.Y;
-                var pos_Z = pos_Z_next + (bbDimensions.Z * 0.5f) - relativeCenter.Z; //yes
+                var pos_Z = pos_Z_next + (bbDimensions.Z * 0.5f) - relativeCenter.Z;
 
                 asset.Position = new Vector3(pos_X, pos_Y, pos_Z);
 
@@ -608,7 +598,6 @@ namespace StudioCore.MsbEditor
         private int aeg_grid_aegNumMin = 0;
         private int aeg_grid_aegNumMax = 5;
         private float aeg_grid_xPosRowThreshold = 1000.0f;
-        private int aeg_grid_minAssetsPerRow = 1;
         public override void DrawEditorMenu()
         {
             if (ImGui.BeginMenu("Asset grid generator"))
@@ -625,13 +614,6 @@ namespace StudioCore.MsbEditor
                     if (aeg_grid_xPosRowThreshold < 1f)
                         aeg_grid_xPosRowThreshold = 1f;
                 }
-                /*
-                if (ImGui.InputInt("Minimum assets per row", ref aeg_grid_minAssetsPerRow))
-                {
-                    if (aeg_grid_minAssetsPerRow < 1)
-                        aeg_grid_minAssetsPerRow = 1;
-                }
-                */
                 if (ImGui.Button("Sort"))
                 {
                     SortGrid();
