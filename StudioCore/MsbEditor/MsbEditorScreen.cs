@@ -558,11 +558,18 @@ namespace StudioCore.MsbEditor
             foreach (var folder in Directory.GetDirectories($@"{AssetLocator.GameRootDirectory}\asset\aeg"))
             {
                 var folderName = Path.GetFileNameWithoutExtension(folder);
-
+                /*
                 var aegNum = int.Parse(folderName.Replace("aeg", ""));
                 if (aegNum < aeg_grid_aegNumMin || aegNum > aeg_grid_aegNumMax)
                 {
                     // Not within aeg range for this map, skip.
+                    continue;
+                }
+                */
+                var aegNum = folderName.Replace("aeg", "");
+                if (!aeg_range_string.Split(",").Contains(aegNum))
+                {
+                    // Not within aeg range, skip.
                     continue;
                 }
 
@@ -595,26 +602,32 @@ namespace StudioCore.MsbEditor
             }
         }
 
-        private int aeg_grid_aegNumMin = 0;
-        private int aeg_grid_aegNumMax = 5;
+        //private int aeg_grid_aegNumMin = 0;
+        //private int aeg_grid_aegNumMax = 5;
+        private string aeg_range_string = "001,005,027,240,";
         private float aeg_grid_xPosRowThreshold = 1000.0f;
         public override void DrawEditorMenu()
         {
             if (ImGui.BeginMenu("Asset grid generator"))
             {
                 ImGui.Text("For generating a grid of assets (uses first loaded map)");
-                ImGui.InputInt("AEG min", ref aeg_grid_aegNumMin);
-                ImGui.InputInt("AEG max", ref aeg_grid_aegNumMax);
-                if (ImGui.Button("Populate"))
+                ImGui.NewLine();
+                ImGui.Text("Asset generation: choose AEGs to import, then populate map.");
+                ImGui.InputText("AEG targets (Must have leading zeroes. Comma separated)", ref aeg_range_string, 999);
+                if (ImGui.Button("Populate map with assets"))
                 {
                     GenerateGrid();
                 }
+
+                ImGui.NewLine();
+
+                ImGui.Text("Sorting: Choose grid row distance, then sort map.");
                 if (ImGui.DragFloat("Distance before starting new row", ref aeg_grid_xPosRowThreshold))
                 {
                     if (aeg_grid_xPosRowThreshold < 1f)
                         aeg_grid_xPosRowThreshold = 1f;
                 }
-                if (ImGui.Button("Sort"))
+                if (ImGui.Button("Sort assets as grid"))
                 {
                     SortGrid();
                 }
