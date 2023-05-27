@@ -17,5 +17,6 @@ namespace StudioCore
         Bloodborne = 6,
         Sekiro = 7,
         EldenRing = 8,
+        ArmoredCoreForAnswer = 9,
     }
 }

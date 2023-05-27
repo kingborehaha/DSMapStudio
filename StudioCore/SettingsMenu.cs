@@ -157,6 +157,42 @@ namespace StudioCore
                         {
                             ProjSettings.PartialParams = usepartial;
                         }
+
+                        string regPath = ProjSettings.TargetRegulationPath;
+                        if (ProjSettings.GameType is GameType.ArmoredCoreForAnswer)
+                        {
+                            ImGui.AlignTextToFramePadding();
+                            ImGui.Text("Target regulation:          ");
+                            ImGui.SameLine();
+                            Utils.ImGuiGenericHelpPopup("?", "##Help_AcfaTargetReg",
+                                "Which regulation to use. This can be changed at any time in project settings.");
+                            ImGui.SameLine();
+                            if (ImGui.Button($@"{ForkAwesome.FileO}##fd3"))
+                            {
+                                var browseDlg = new System.Windows.Forms.FolderBrowserDialog();
+                                browseDlg.InitialDirectory = ProjSettings.GameRoot;
+                                if (browseDlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                                {
+                                    regPath = browseDlg.SelectedPath;
+                                    Debugger.Break();
+                                }
+                            }
+                            if (regPath != ProjSettings.TargetRegulationPath)
+                            {
+                                Debugger.Break();
+                                if (System.IO.File.Exists(ProjSettings.TargetRegulationPath))
+                                {
+                                    ProjSettings.TargetRegulationPath = regPath;
+                                    StudioCore.ParamEditor.ParamBank.ReloadParams(ProjSettings);
+                                }
+                                else
+                                {
+                                    System.Windows.Forms.MessageBox.Show("Your target regulation does not exist. Please select a valid regulation.", "Error",
+                                        System.Windows.Forms.MessageBoxButtons.OK,
+                                        System.Windows.Forms.MessageBoxIcon.None);
+                                }
+                            }
+                        }
                     }
                 }
 

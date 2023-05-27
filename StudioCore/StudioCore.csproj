@@ -492,4 +492,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Assets\Paramdex\ACFA\Defs\" />
+  </ItemGroup>
+
 </Project>

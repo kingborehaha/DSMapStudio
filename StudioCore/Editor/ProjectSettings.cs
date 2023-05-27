@@ -27,6 +27,7 @@ namespace StudioCore.Editor
         public List<string> PinnedParams { get; set; } = new List<string>();
         public Dictionary<string, List<int>> PinnedRows { get; set; } = new Dictionary<string, List<int>>();
         public Dictionary<string, List<string>> PinnedFields { get; set; } = new Dictionary<string, List<string>>();
+        public string TargetRegulationPath { get; set; } = "";
 
         /// <summary>
         /// Has different meanings depending on the game, but for supported games
@@ -38,6 +39,7 @@ namespace StudioCore.Editor
 
         // FMG editor
         public string LastFmgLanguageUsed { get; set; } = "";
+
 
         public void Serialize(string path)
         {

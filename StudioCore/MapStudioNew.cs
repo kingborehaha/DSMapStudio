@@ -1254,6 +1254,38 @@ namespace StudioCore
                     ImGui.SameLine();
                     ImGui.TextUnformatted("Warning: partial params require merging before use in game.\nRow names on unchanged rows will be forgotten between saves");
                 }
+                else if (_newProjectOptions.settings.GameType == GameType.ArmoredCoreForAnswer)
+                {
+                    ImGui.NewLine();
+                    ImGui.AlignTextToFramePadding();
+                    ImGui.Text("Target regulation: ");
+                    ImGui.SameLine();
+                    Utils.ImGuiGenericHelpPopup("?", "##Help_AcfaTargetReg",
+                        "Which regulation to use. This can be changed at any time in project settings.");
+                    ImGui.SameLine();
+                    var regName = _newProjectOptions.settings.TargetRegulationPath;
+                    if (ImGui.InputText("##acfaReg", ref regName, 255))
+                    {
+                        _newProjectOptions.settings.TargetRegulationPath = regName;
+                    }
+                    ImGui.SameLine();
+                    if (ImGui.Button($@"{ForkAwesome.FileO}##fd3"))
+                    {
+                        var browseDlg = new System.Windows.Forms.OpenFileDialog()
+                        {
+                            Filter = "ACFA Regulation (.BIN) |*.BIN*|" +
+                                "All Files|*.*",
+                            ValidateNames = true,
+                            CheckFileExists = true,
+                            CheckPathExists = true,
+                        };
+
+                        if (browseDlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                        {
+                            _newProjectOptions.settings.TargetRegulationPath = browseDlg.FileName;
+                        }
+                    }
+                }
                 ImGui.NewLine();
 
                 ImGui.AlignTextToFramePadding();
@@ -1279,6 +1311,13 @@ namespace StudioCore
                     if (_newProjectOptions.settings.GameRoot == null || !Directory.Exists(_newProjectOptions.settings.GameRoot))
                     {
                         System.Windows.Forms.MessageBox.Show("Your game executable path does not exist. Please select a valid executable.", "Error",
+                            System.Windows.Forms.MessageBoxButtons.OK,
+                            System.Windows.Forms.MessageBoxIcon.None);
+                        validated = false;
+                    }
+                    if (validated && _newProjectOptions.settings.GameType is GameType.ArmoredCoreForAnswer && !File.Exists(_newProjectOptions.settings.TargetRegulationPath))
+                    {
+                        System.Windows.Forms.MessageBox.Show("Your target regulation does not exist. Please select a valid regulation.", "Error",
                             System.Windows.Forms.MessageBoxButtons.OK,
                             System.Windows.Forms.MessageBoxIcon.None);
                         validated = false;

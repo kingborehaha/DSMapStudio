@@ -185,7 +185,15 @@ namespace StudioCore.ParamEditor
             {
                 if (!f.Name.ToUpper().EndsWith(".PARAM"))
                 {
-                    continue;
+                    if (AssetLocator.Type is GameType.ArmoredCoreForAnswer)
+                    {
+                        if (!f.Name.ToUpper().EndsWith(".BIN"))
+                            continue;
+                    }
+                    else
+                    {
+                        continue;
+                    }
                 }
                 if (paramBank.ContainsKey(Path.GetFileNameWithoutExtension(f.Name)))
                 {
@@ -325,13 +333,102 @@ namespace StudioCore.ParamEditor
             {
                 foreach (var p in Directory.GetFiles($@"{AssetLocator.GameRootDirectory}\param\drawparam", "*.parambnd.dcx"))
                 {
-                    LoadParamsDS1FromFile(p);
+                    LoadParamsDESFromFile(p);
                 }
             }
         }
         private void LoadParamsDESFromFile(string path)
         {
             LoadParamFromBinder(BND3.Read(path), ref _params, out _paramVersion);
+        }
+
+        private void LoadParamsACFA(ProjectSettings settings)
+        {
+            var dir = AssetLocator.GameRootDirectory;
+            var mod = AssetLocator.GameModDirectory;
+            // Load params from mod folder first, game folder otherwise.
+            LoadParamsACFAFromFileRelativePath($@"bind/boot.bnd", false);
+            foreach (var path in Directory.GetFiles($@"bind/event"))
+            {
+                LoadParamsACFAFromFileRelativePath(path, false);
+            }
+
+            //ACFA TODO: set and read this
+            List<string> regulationPaths = new();
+            foreach (var bnd in Directory.GetFiles(dir, "*.bin"))
+            {
+                if (BND3.Is(bnd))
+                {
+                    foreach (var file in BND3.Read(bnd).Files)
+                    {
+                        if (PARAM.Is(file.Bytes))
+                        {
+                            break;
+                            regulationPaths.Add(bnd);
+                        }
+                    }
+                }
+            }
+            LoadParamsACFAFromFileRelativePath(regulationPaths[0], false); //temp
+
+            //settings.AcfaRegulationPath;
+        }
+        private void LoadVParamsACFA(ProjectSettings settings)
+        {
+            // Load params from game folder for vanilla comparisons
+            // ACFA TODO: param paths
+        }
+        private void LoadParamsACFAFromFileRelativePath(string path, bool gameRootOnly)
+        {
+            var dir = AssetLocator.GameRootDirectory;
+            var mod = AssetLocator.GameModDirectory;
+            string parambndPath;
+            if (gameRootOnly)
+            {
+                parambndPath = $@"{dir}\{path}";
+            }
+            else
+            {
+                parambndPath = $@"{mod}\{path}";
+                if (!File.Exists(parambndPath))
+                {
+                    parambndPath = $@"{dir}\{path}";
+                }
+            }
+            LoadParamsACFAFromFile(parambndPath);
+        }
+        private void LoadParamsACFAFromFile(string path)
+        {
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("Could not find ACFA params. Functionality will be limited.");
+            }
+            if (BND3.Is(path))
+            {
+                // ACFA TODO: any bnds within bnds?
+                LoadParamFromBinder(BND3.Read(path), ref _params, out _paramVersion);
+            }
+            else
+            {
+                // Standalone param file
+                var name = Path.GetFileNameWithoutExtension(path);
+                var lp = Param.Read(path);
+                var fname = lp.ParamType;
+
+                try
+                {
+                    PARAMDEF def = AssetLocator.GetParamdefForParam(fname);
+                    lp.ApplyParamdef(def);
+                    if (!_params.ContainsKey(name))
+                    {
+                        _params.Add(name, lp);
+                    }
+                }
+                catch
+                {
+                    TaskManager.warningList.TryAdd($"{fname} DefFail", $"Could not apply ParamDef for {fname}");
+                }
+            }
         }
 
         private void LoadParamsDS1()
@@ -708,7 +805,7 @@ namespace StudioCore.ParamEditor
         }
 
         //Some returns and repetition, but it keeps all threading and loading-flags visible inside this method
-        public static void ReloadParams(ProjectSettings settings, NewProjectOptions options)
+        public static void ReloadParams(ProjectSettings settings, NewProjectOptions options = null)
         {
             // Steal assetlocator from PrimaryBank.
             AssetLocator locator = PrimaryBank.AssetLocator;
@@ -764,6 +861,10 @@ namespace StudioCore.ParamEditor
                 {
                     PrimaryBank.LoadParamsER(settings.PartialParams);
                 }
+                if (locator.Type == GameType.ArmoredCoreForAnswer)
+                {
+                    PrimaryBank.LoadParamsACFA(settings);
+                }
 
                 PrimaryBank.ClearParamDiffCaches();
                 PrimaryBank.IsLoadingParams = false;
@@ -799,6 +900,10 @@ namespace StudioCore.ParamEditor
                     if (locator.Type == GameType.EldenRing)
                     {
                         VanillaBank.LoadVParamsER();
+                    }
+                    if (locator.Type == GameType.ArmoredCoreForAnswer)
+                    {
+                        PrimaryBank.LoadVParamsACFA(settings);
                     }
                     VanillaBank.IsLoadingParams = false;
 

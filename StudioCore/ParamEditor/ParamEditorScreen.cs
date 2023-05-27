@@ -1659,6 +1659,13 @@ namespace StudioCore.ParamEditor
                     CacheBank.ClearCaches();
                 ImGui.Separator();
             }
+            else if (ParamBank.PrimaryBank.AssetLocator.Type is GameType.ArmoredCoreForAnswer)
+            {
+                // ACFA has map params, add UI element to toggle viewing map params and GameParams.
+                if (ImGui.Checkbox("Edit Map Params", ref _mapParamView))
+                    CacheBank.ClearCaches();
+                ImGui.Separator();
+            }
 
             List<string> pinnedParamKeyList = new List<string>(_paramEditor._projectSettings.PinnedParams);
 
@@ -1705,6 +1712,13 @@ namespace StudioCore.ParamEditor
                         keyList = keyList.FindAll(p => ParamBank.DS2MapParamlist.Contains(p.Split('_')[0]));
                     else
                         keyList = keyList.FindAll(p => !ParamBank.DS2MapParamlist.Contains(p.Split('_')[0]));
+                }
+                else if (ParamBank.PrimaryBank.AssetLocator.Type is GameType.ArmoredCoreForAnswer)
+                {
+                    if (_mapParamView)
+                        keyList = keyList.FindAll(p => p[0] == 'm' && p.Contains("_event"));
+                    else
+                        keyList = keyList.FindAll(p => p[0] != 'm' || p.Contains("_event"));
                 }
 
                 if (CFG.Current.Param_AlphabeticalParams)
