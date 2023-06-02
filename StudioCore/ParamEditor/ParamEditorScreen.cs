@@ -1340,7 +1340,7 @@ namespace StudioCore.ParamEditor
             {
                 if (_projectSettings != null)
                 {
-                    ParamBank.PrimaryBank.SaveParams(_projectSettings.UseLooseParams, _projectSettings.PartialParams);
+                    ParamBank.PrimaryBank.SaveParams(_projectSettings);
                 }
             }
             catch (SavingFailedException e)
@@ -1357,7 +1357,7 @@ namespace StudioCore.ParamEditor
             {
                 if (_projectSettings != null)
                 {
-                    ParamBank.PrimaryBank.SaveParams(_projectSettings.UseLooseParams, _projectSettings.PartialParams);
+                    ParamBank.PrimaryBank.SaveParams(_projectSettings);
                 }
             }
             catch (SavingFailedException e)

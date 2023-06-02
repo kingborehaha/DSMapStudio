@@ -917,7 +917,7 @@ namespace StudioCore.ParamEditor
                         try
                         {
                             new Editor.ActionManager().ExecuteAction(PrimaryBank.LoadParamDefaultNames());
-                            PrimaryBank.SaveParams(settings.UseLooseParams);
+                            PrimaryBank.SaveParams(settings);
                         }
                         catch
                         {
@@ -1455,6 +1455,87 @@ namespace StudioCore.ParamEditor
                 }
             }
         }
+        private void SaveParamsACFA(string regPath)
+        {
+            // ACFA TODO: all
+            var dir = AssetLocator.GameRootDirectory;
+            var mod = AssetLocator.GameModDirectory;
+
+            string paramBinderName = GetDesGameparamName(mod);
+            if (paramBinderName == "")
+            {
+                paramBinderName = GetDesGameparamName(dir);
+            }
+
+            // Load params
+            var param = $@"{mod}\param\gameparam\{paramBinderName}";
+            if (!File.Exists(param))
+            {
+                param = $@"{dir}\param\gameparam\{paramBinderName}";
+            }
+
+            if (!File.Exists(param))
+            {
+                MessageBox.Show("Could not find param file. Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            BND3 paramBnd = BND3.Read(param);
+
+            // Replace params with edited ones
+            foreach (var p in paramBnd.Files)
+            {
+                if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
+                {
+                    p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
+                }
+            }
+
+            // Write all gameparam variations since we don't know which one the the game will use.
+            // Compressed
+            paramBnd.Compression = DCX.Type.DCX_EDGE;
+            string naParamPath = $@"param\gameparam\gameparamna.parambnd.dcx";
+            if (File.Exists($@"{dir}\{naParamPath}"))
+            {
+                Utils.WriteWithBackup(dir, mod, naParamPath, paramBnd);
+            }
+            Utils.WriteWithBackup(dir, mod, $@"param\gameparam\gameparam.parambnd.dcx", paramBnd);
+
+            // Decompressed
+            paramBnd.Compression = DCX.Type.None;
+            naParamPath = $@"param\gameparam\gameparamna.parambnd";
+            if (File.Exists($@"{dir}\{naParamPath}"))
+            {
+                Utils.WriteWithBackup(dir, mod, naParamPath, paramBnd);
+            }
+            Utils.WriteWithBackup(dir, mod, $@"param\gameparam\gameparam.parambnd", paramBnd);
+
+            // Drawparam
+            List<string> drawParambndPaths = new();
+            if (Directory.Exists($@"{AssetLocator.GameRootDirectory}\param\drawparam"))
+            {
+                foreach (var bnd in Directory.GetFiles($@"{AssetLocator.GameRootDirectory}\param\drawparam", "*.parambnd.dcx"))
+                {
+                    drawParambndPaths.Add(bnd);
+                }
+                // Also save decompressed parambnds because DeS debug uses them.
+                foreach (var bnd in Directory.GetFiles($@"{AssetLocator.GameRootDirectory}\param\drawparam", "*.parambnd"))
+                {
+                    drawParambndPaths.Add(bnd);
+                }
+                foreach (var bnd in drawParambndPaths)
+                {
+                    paramBnd = BND3.Read(bnd);
+                    foreach (var p in paramBnd.Files)
+                    {
+                        if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
+                        {
+                            p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
+                        }
+                    }
+                    Utils.WriteWithBackup(dir, mod, @$"param\drawparam\{Path.GetFileName(bnd)}", paramBnd);
+                }
+            }
+        }
         private void SaveParamsER(bool partial)
         {
             var dir = AssetLocator.GameRootDirectory;
@@ -1500,7 +1581,7 @@ namespace StudioCore.ParamEditor
             _pendingUpgrade = false;
         }
 
-        public void SaveParams(bool loose = false, bool partialParams = false)
+        public void SaveParams(ProjectSettings projSettings) // bool loose = false, bool partialParams = false
         {
             if (_params == null)
             {
@@ -1520,11 +1601,11 @@ namespace StudioCore.ParamEditor
             }
             if (AssetLocator.Type == GameType.DarkSoulsIISOTFS)
             {
-                SaveParamsDS2(loose);
+                SaveParamsDS2(projSettings.UseLooseParams);
             }
             if (AssetLocator.Type == GameType.DarkSoulsIII)
             {
-                SaveParamsDS3(loose);
+                SaveParamsDS3(projSettings.UseLooseParams);
             }
             if (AssetLocator.Type == GameType.Bloodborne || AssetLocator.Type == GameType.Sekiro)
             {
@@ -1532,7 +1613,11 @@ namespace StudioCore.ParamEditor
             }
             if (AssetLocator.Type == GameType.EldenRing)
             {
-                SaveParamsER(partialParams);
+                SaveParamsER(projSettings.PartialParams);
+            }
+            if (AssetLocator.Type == GameType.ArmoredCoreForAnswer)
+            {
+                SaveParamsACFA(projSettings.TargetRegulationPath);
             }
         }
 
