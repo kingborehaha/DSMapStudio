@@ -347,8 +347,8 @@ namespace StudioCore.ParamEditor
             var dir = AssetLocator.GameRootDirectory;
             var mod = AssetLocator.GameModDirectory;
             // Load params from mod folder first, game folder otherwise.
-            LoadParamsACFAFromFileRelativePath($@"bind/boot.bnd", false);
-            foreach (var path in Directory.GetFiles($@"bind/event"))
+            LoadParamsACFAFromFileRelativePath($@"bind\boot.bnd", false);
+            foreach (var path in Directory.GetFiles($@"bind\event"))
             {
                 LoadParamsACFAFromFileRelativePath(path, false);
             }
