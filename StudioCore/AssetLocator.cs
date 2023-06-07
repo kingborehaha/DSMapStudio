@@ -728,6 +728,8 @@ namespace StudioCore
                     return "SDT";
                 case GameType.EldenRing:
                     return "ER";
+                case GameType.ArmoredCoreForAnswer:
+                    return "ACFA";
                 default:
                     throw new Exception("Game type not set");
             }

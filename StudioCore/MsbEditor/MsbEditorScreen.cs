@@ -1073,6 +1073,11 @@ namespace StudioCore.MsbEditor
             GC.Collect();
             Universe.PopulateMapList();
 
+            if (AssetLocator.Type == GameType.ArmoredCoreForAnswer)
+            {
+                // ACFA: currently unsupported
+                return;
+            }
             if (AssetLocator.Type != GameType.Undefined)
             {
                 PopulateClassNames(AssetLocator.Type);
