@@ -1254,6 +1254,7 @@ namespace StudioCore
                     ImGui.SameLine();
                     ImGui.TextUnformatted("Warning: partial params require merging before use in game.\nRow names on unchanged rows will be forgotten between saves");
                 }
+                /*
                 else if (_newProjectOptions.settings.GameType == GameType.ArmoredCoreForAnswer)
                 {
                     ImGui.NewLine();
@@ -1286,6 +1287,7 @@ namespace StudioCore
                         }
                     }
                 }
+                */
                 ImGui.NewLine();
 
                 ImGui.AlignTextToFramePadding();
@@ -1315,6 +1317,7 @@ namespace StudioCore
                             System.Windows.Forms.MessageBoxIcon.None);
                         validated = false;
                     }
+                    /*
                     if (validated && _newProjectOptions.settings.GameType is GameType.ArmoredCoreForAnswer && !File.Exists(_newProjectOptions.settings.TargetRegulationPath))
                     {
                         System.Windows.Forms.MessageBox.Show("Your target regulation does not exist. Please select a valid regulation.", "Error",
@@ -1322,6 +1325,7 @@ namespace StudioCore
                             System.Windows.Forms.MessageBoxIcon.None);
                         validated = false;
                     }
+                    */
                     if (validated && _newProjectOptions.settings.GameType == GameType.Undefined)
                     {
                         System.Windows.Forms.MessageBox.Show("Your game executable is not a valid supported game.", "Error",

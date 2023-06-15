@@ -45,6 +45,32 @@ namespace StudioCore.ParamEditor
         public static bool IsMetaLoaded { get; private set; } = false;
         public bool IsLoadingParams { get; private set; } = false;
 
+        // List of file names in ACFA that DSMS should not attempt to load as params.
+        private static readonly List<string> _ACFA_Blacklist = new()
+        {
+            "AcAnimParam",
+            "AcsisDisplayCommon",
+            "AcVibrationParam",
+            "AIGeneralParam",
+            "Assemble",
+            "Damage",
+            "EnemyBehavior",
+            "Explosion",
+            "LockDeflection",
+            "Missile",
+            "MissionEstimateCommon",
+            "MissionGeneralParam",
+            "NewAcBehavior",
+            "Radar",
+            "SideBooster",
+            "SuperOverBooster",
+            "WeaponEstimation",
+            "AcParts",
+            "Trial_AcParts",
+            "Stabilizer",
+            "MissionReward",
+        };
+
         public IReadOnlyDictionary<string, Param> Params
         {
             get
@@ -180,17 +206,22 @@ namespace StudioCore.ParamEditor
             }
 
             // Load every param in the regulation
-            // _params = new Dictionary<string, PARAM>();
             foreach (var f in parambnd.Files)
             {
-                if (!f.Name.ToUpper().EndsWith(".PARAM"))
+                if (AssetLocator.Type is GameType.ArmoredCoreForAnswer)
                 {
-                    if (AssetLocator.Type is GameType.ArmoredCoreForAnswer)
-                    {
-                        if (!f.Name.ToUpper().EndsWith(".BIN"))
-                            continue;
-                    }
-                    else
+                    if (!f.Name.ToUpper().EndsWith(".PARAM") && !f.Name.ToUpper().EndsWith(".BIN"))
+                        continue;
+                    if (!f.Name.ToUpper().StartsWith("PARAM\\") && !f.Name.ToUpper().StartsWith("AIRESOURCE"))
+                        continue;
+                    if (f.Name.ToUpper().StartsWith("PARAM\\ACCOLOR"))
+                        continue;
+                    if (_ACFA_Blacklist.Contains(Path.GetFileNameWithoutExtension(f.Name)))
+                        continue;
+                }
+                else
+                {
+                    if (!f.Name.ToUpper().EndsWith(".PARAM"))
                     {
                         continue;
                     }
@@ -344,39 +375,38 @@ namespace StudioCore.ParamEditor
 
         private void LoadParamsACFA(ProjectSettings settings)
         {
+            // Load params from mod folder first, game folder otherwise.
             var dir = AssetLocator.GameRootDirectory;
             var mod = AssetLocator.GameModDirectory;
-            // Load params from mod folder first, game folder otherwise.
+
+            // Load regulation params first, as game prioritizes them
+            LoadParamsACFAFromFileRelativePath($@"param\regulation.bin", false);
+
+            foreach (var path in Directory.GetFiles($@"{dir}\bind\event", "*event.bnd"))
+            {
+                string relativePath = path.Replace($@"{dir}\", "");
+                LoadParamsACFAFromFileRelativePath(relativePath, false);
+            }
+
             LoadParamsACFAFromFileRelativePath($@"bind\boot.bnd", false);
-            foreach (var path in Directory.GetFiles($@"bind\event"))
-            {
-                LoadParamsACFAFromFileRelativePath(path, false);
-            }
 
-            //ACFA TODO: set and read this
-            List<string> regulationPaths = new();
-            foreach (var bnd in Directory.GetFiles(dir, "*.bin"))
-            {
-                if (BND3.Is(bnd))
-                {
-                    foreach (var file in BND3.Read(bnd).Files)
-                    {
-                        if (PARAM.Is(file.Bytes))
-                        {
-                            break;
-                            regulationPaths.Add(bnd);
-                        }
-                    }
-                }
-            }
-            LoadParamsACFAFromFileRelativePath(regulationPaths[0], false); //temp
-
-            //settings.AcfaRegulationPath;
         }
         private void LoadVParamsACFA(ProjectSettings settings)
         {
             // Load params from game folder for vanilla comparisons
-            // ACFA TODO: param paths
+            var dir = AssetLocator.GameRootDirectory;
+            var mod = AssetLocator.GameModDirectory;
+
+            // Load regulation params first, as game prioritizes them
+            LoadParamsACFAFromFileRelativePath($@"param\regulation.bin", true);
+
+            foreach (var path in Directory.GetFiles($@"{dir}\bind\event", "*event.bnd"))
+            {
+                string relativePath = path.Replace($@"{dir}\", "");
+                LoadParamsACFAFromFileRelativePath(relativePath, true);
+            }
+
+            LoadParamsACFAFromFileRelativePath($@"bind\boot.bnd", true);
         }
         private void LoadParamsACFAFromFileRelativePath(string path, bool gameRootOnly)
         {
@@ -397,6 +427,7 @@ namespace StudioCore.ParamEditor
             }
             LoadParamsACFAFromFile(parambndPath);
         }
+
         private void LoadParamsACFAFromFile(string path)
         {
             if (!File.Exists(path))

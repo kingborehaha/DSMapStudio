@@ -1723,9 +1723,9 @@ namespace StudioCore.ParamEditor
                 else if (ParamBank.PrimaryBank.AssetLocator.Type is GameType.ArmoredCoreForAnswer)
                 {
                     if (_mapParamView)
-                        keyList = keyList.FindAll(p => p[0] == 'm' && p.Contains("_event"));
+                        keyList = keyList.FindAll(p => p[0] == 'm' && char.IsDigit(p[1]));
                     else
-                        keyList = keyList.FindAll(p => p[0] != 'm' || p.Contains("_event"));
+                        keyList = keyList.FindAll(p => (p[0] == 'm' && char.IsDigit(p[1])) == false);
                 }
 
                 if (CFG.Current.Param_AlphabeticalParams)
