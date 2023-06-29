@@ -165,7 +165,8 @@ namespace StudioCore
                             ImGui.Text("Target regulation:          ");
                             ImGui.SameLine();
                             Utils.ImGuiGenericHelpPopup("?", "##Help_AcfaTargetReg",
-                                "Which regulation to use. This can be changed at any time in project settings.");
+                                "Optional. Used for non-standard regulation. If left empty, \"param\\regulation.bin\" is used.\n" +
+                                "Target regulation saves to \"param\\X.bin\".");
                             ImGui.SameLine();
                             if (ImGui.Button($@"{ForkAwesome.FileO}##fd3"))
                             {

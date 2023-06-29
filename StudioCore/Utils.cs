@@ -242,6 +242,10 @@ namespace StudioCore
                 {
                     File.Copy(assetgamepath, $@"{assetgamepath}.bak", true);
                 }
+                else if (moddir == gamedir && !File.Exists($@"{assetgamepath}.bak") && File.Exists(assetgamepath))
+                {
+                    File.Copy(assetgamepath, $@"{assetgamepath}.bak", true);
+                }
 
                 var writepath = (moddir == null) ? assetgamepath : assetmodpath;
 

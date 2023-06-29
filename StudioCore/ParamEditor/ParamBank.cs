@@ -380,7 +380,14 @@ namespace StudioCore.ParamEditor
             var mod = AssetLocator.GameModDirectory;
 
             // Load regulation params first, as game prioritizes them
-            LoadParamsACFAFromFileRelativePath($@"param\regulation.bin", false);
+            if (settings.TargetRegulationPath != "")
+            {
+                LoadParamsACFAFromFileRelativePath($@"param\regulation.bin", false);
+            }
+            else
+            {
+                LoadParamsACFAFromFile(settings.TargetRegulationPath);
+            }
 
             foreach (var path in Directory.GetFiles($@"{dir}\bind\event", "*event.bnd"))
             {
@@ -398,7 +405,7 @@ namespace StudioCore.ParamEditor
             var mod = AssetLocator.GameModDirectory;
 
             // Load regulation params first, as game prioritizes them
-            LoadParamsACFAFromFileRelativePath($@"param\regulation.bin", true);
+            LoadParamsACFAFromFileRelativePath($@"param\regulation.bin", true); // Load default regulation.bin for VParams
 
             foreach (var path in Directory.GetFiles($@"{dir}\bind\event", "*event.bnd"))
             {
@@ -436,7 +443,6 @@ namespace StudioCore.ParamEditor
             }
             if (BND3.Is(path))
             {
-                // ACFA TODO: any bnds within bnds?
                 LoadParamFromBinder(BND3.Read(path), ref _params, out _paramVersion);
             }
             else
@@ -1406,6 +1412,7 @@ namespace StudioCore.ParamEditor
             }
             Utils.WriteWithBackup(dir, mod, @"param\gameparam\gameparam.parambnd.dcx", paramBnd);
         }
+
         private void SaveParamsDES()
         {
             var dir = AssetLocator.GameRootDirectory;
@@ -1486,34 +1493,35 @@ namespace StudioCore.ParamEditor
                 }
             }
         }
-        private void SaveParamsACFA(string regPath)
+
+        private void SaveParamsACFA(ProjectSettings settings)
         {
-            // ACFA TODO: all
             var dir = AssetLocator.GameRootDirectory;
             var mod = AssetLocator.GameModDirectory;
+            string regPath = "";
 
-            string paramBinderName = GetDesGameparamName(mod);
-            if (paramBinderName == "")
+            // regulation.bin
+            if (settings.TargetRegulationPath != "")
             {
-                paramBinderName = GetDesGameparamName(dir);
+                regPath = settings.TargetRegulationPath;
+            }
+            else
+            {
+                regPath = $@"{mod}\param\regulation.bin";
+                if (!File.Exists(regPath))
+                {
+                    regPath = $@"{dir}\param\regulation.bin";
+                }
             }
 
-            // Load params
-            var param = $@"{mod}\param\gameparam\{paramBinderName}";
-            if (!File.Exists(param))
+            if (!File.Exists(regPath))
             {
-                param = $@"{dir}\param\gameparam\{paramBinderName}";
-            }
-
-            if (!File.Exists(param))
-            {
-                MessageBox.Show("Could not find param file. Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Could not find regulation file at \"{regPath}\". Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            BND3 paramBnd = BND3.Read(param);
 
-            // Replace params with edited ones
-            foreach (var p in paramBnd.Files)
+            BND3 regulation = BND3.Read(regPath);
+            foreach (var p in regulation.Files)
             {
                 if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
                 {
@@ -1521,52 +1529,41 @@ namespace StudioCore.ParamEditor
                 }
             }
 
-            // Write all gameparam variations since we don't know which one the the game will use.
-            // Compressed
-            paramBnd.Compression = DCX.Type.DCX_EDGE;
-            string naParamPath = $@"param\gameparam\gameparamna.parambnd.dcx";
-            if (File.Exists($@"{dir}\{naParamPath}"))
+            if (settings.TargetRegulationPath != "")
             {
-                Utils.WriteWithBackup(dir, mod, naParamPath, paramBnd);
+                var regName = Path.GetFileNameWithoutExtension(settings.TargetRegulationPath);
+                Utils.WriteWithBackup(null, mod, $@"\param\{regName}.bin", regulation);
             }
-            Utils.WriteWithBackup(dir, mod, $@"param\gameparam\gameparam.parambnd.dcx", paramBnd);
+            else
+            {
+                Utils.WriteWithBackup(dir, mod, $@"\param\regulation.bin", regulation);
+            }
 
-            // Decompressed
-            paramBnd.Compression = DCX.Type.None;
-            naParamPath = $@"param\gameparam\gameparamna.parambnd";
-            if (File.Exists($@"{dir}\{naParamPath}"))
-            {
-                Utils.WriteWithBackup(dir, mod, naParamPath, paramBnd);
-            }
-            Utils.WriteWithBackup(dir, mod, $@"param\gameparam\gameparam.parambnd", paramBnd);
 
-            // Drawparam
-            List<string> drawParambndPaths = new();
-            if (Directory.Exists($@"{AssetLocator.GameRootDirectory}\param\drawparam"))
+            // boot.bnd
+            var bndPath = $@"{mod}\bind\boot.bnd";
+            if (!File.Exists(bndPath))
             {
-                foreach (var bnd in Directory.GetFiles($@"{AssetLocator.GameRootDirectory}\param\drawparam", "*.parambnd.dcx"))
+                bndPath = $@"{dir}\bind\boot.bnd";
+            }
+            if (!File.Exists(bndPath))
+            {
+                MessageBox.Show("Could not find boot.bnd file. Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            BND3 bootBnd = BND3.Read(bndPath);
+            foreach (var p in bootBnd.Files)
+            {
+                if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
                 {
-                    drawParambndPaths.Add(bnd);
-                }
-                // Also save decompressed parambnds because DeS debug uses them.
-                foreach (var bnd in Directory.GetFiles($@"{AssetLocator.GameRootDirectory}\param\drawparam", "*.parambnd"))
-                {
-                    drawParambndPaths.Add(bnd);
-                }
-                foreach (var bnd in drawParambndPaths)
-                {
-                    paramBnd = BND3.Read(bnd);
-                    foreach (var p in paramBnd.Files)
-                    {
-                        if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
-                        {
-                            p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
-                        }
-                    }
-                    Utils.WriteWithBackup(dir, mod, @$"param\drawparam\{Path.GetFileName(bnd)}", paramBnd);
+                    p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
                 }
             }
+
+            Utils.WriteWithBackup(dir, mod, $@"\bind\boot.bnd", bootBnd);
         }
+
         private void SaveParamsER(bool partial)
         {
             var dir = AssetLocator.GameRootDirectory;
@@ -1648,7 +1645,7 @@ namespace StudioCore.ParamEditor
             }
             if (AssetLocator.Type == GameType.ArmoredCoreForAnswer)
             {
-                SaveParamsACFA(projSettings.TargetRegulationPath);
+                SaveParamsACFA(projSettings);
             }
         }
 

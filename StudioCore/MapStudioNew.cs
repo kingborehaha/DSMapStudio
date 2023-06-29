@@ -1254,7 +1254,6 @@ namespace StudioCore
                     ImGui.SameLine();
                     ImGui.TextUnformatted("Warning: partial params require merging before use in game.\nRow names on unchanged rows will be forgotten between saves");
                 }
-                /*
                 else if (_newProjectOptions.settings.GameType == GameType.ArmoredCoreForAnswer)
                 {
                     ImGui.NewLine();
@@ -1262,7 +1261,8 @@ namespace StudioCore
                     ImGui.Text("Target regulation: ");
                     ImGui.SameLine();
                     Utils.ImGuiGenericHelpPopup("?", "##Help_AcfaTargetReg",
-                        "Which regulation to use. This can be changed at any time in project settings.");
+                        "Optional. Used for non-standard regulation. If left empty, \"param\\regulation.bin\" is used.\n" +
+                        "Target regulation saves to \"param\\X.bin\".\nTarget regulation can be changed at any time in project settings.");
                     ImGui.SameLine();
                     var regName = _newProjectOptions.settings.TargetRegulationPath;
                     if (ImGui.InputText("##acfaReg", ref regName, 255))
@@ -1287,7 +1287,6 @@ namespace StudioCore
                         }
                     }
                 }
-                */
                 ImGui.NewLine();
 
                 ImGui.AlignTextToFramePadding();
@@ -1317,15 +1316,6 @@ namespace StudioCore
                             System.Windows.Forms.MessageBoxIcon.None);
                         validated = false;
                     }
-                    /*
-                    if (validated && _newProjectOptions.settings.GameType is GameType.ArmoredCoreForAnswer && !File.Exists(_newProjectOptions.settings.TargetRegulationPath))
-                    {
-                        System.Windows.Forms.MessageBox.Show("Your target regulation does not exist. Please select a valid regulation.", "Error",
-                            System.Windows.Forms.MessageBoxButtons.OK,
-                            System.Windows.Forms.MessageBoxIcon.None);
-                        validated = false;
-                    }
-                    */
                     if (validated && _newProjectOptions.settings.GameType == GameType.Undefined)
                     {
                         System.Windows.Forms.MessageBox.Show("Your game executable is not a valid supported game.", "Error",
