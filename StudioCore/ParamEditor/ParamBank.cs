@@ -1527,7 +1527,7 @@ namespace StudioCore.ParamEditor
 
             if (!File.Exists(regPath))
             {
-                MessageBox.Show("Could not find regulation file at \"{regPath}\". Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                PlatformUtils.Instance.MessageBox("Could not find regulation file at \"{regPath}\". Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -1559,7 +1559,7 @@ namespace StudioCore.ParamEditor
             }
             if (!File.Exists(bndPath))
             {
-                MessageBox.Show("Could not find boot.bnd file. Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                PlatformUtils.Instance.MessageBox("Could not find boot.bnd file. Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
