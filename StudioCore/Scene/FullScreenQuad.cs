@@ -49,18 +49,23 @@ namespace StudioCore.Scene
             _vb = factory.CreateBuffer(
                 new BufferDescription(
                     (uint)verts.Length * sizeof(float),
-                    VkBufferUsageFlags.VertexBuffer,
-                    VmaMemoryUsage.AutoPreferDevice,
+                    VkBufferUsageFlags.VertexBuffer | VkBufferUsageFlags.TransferDst,
+                    VmaMemoryUsage.Auto,
                     0));
             cl.UpdateBuffer(_vb, 0, verts);
 
             _ib = factory.CreateBuffer(
                 new BufferDescription(
                     (uint)s_quadIndices.Length * sizeof(ushort),
-                    VkBufferUsageFlags.IndexBuffer,
-                    VmaMemoryUsage.AutoPreferDevice,
+                    VkBufferUsageFlags.IndexBuffer | VkBufferUsageFlags.TransferDst,
+                    VmaMemoryUsage.Auto,
                     0));
             cl.UpdateBuffer(_ib, 0, s_quadIndices);
+            
+            cl.Barrier(VkPipelineStageFlags2.Transfer,
+                VkAccessFlags2.TransferWrite,
+                VkPipelineStageFlags2.VertexInput | VkPipelineStageFlags2.IndexInput,
+                VkAccessFlags2.VertexAttributeRead);
         }
 
         public void DestroyDeviceObjects()

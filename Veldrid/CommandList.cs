@@ -25,30 +25,27 @@ namespace Veldrid
     /// <see cref="GraphicsDevice"/>, they must be reset and commands must be issued again.
     /// See <see cref="CommandListDescription"/>.
     /// </summary>
-    public unsafe class CommandList : DeviceResource, IDisposable
+    public unsafe class CommandList : DeviceResource
     {
-        private readonly GraphicsDeviceFeatures _features;
-        private readonly uint _uniformBufferAlignment;
-        private readonly uint _structuredBufferAlignment;
+        private GraphicsDeviceFeatures _features;
+        private uint _uniformBufferAlignment;
+        private uint _structuredBufferAlignment;
 
         private protected Framebuffer _framebuffer;
         private protected Pipeline _graphicsPipeline;
         private protected Pipeline _computePipeline;
-
-        private protected bool _isTransfer;
-
+        
 #if VALIDATE_USAGE
         private DeviceBuffer _indexBuffer;
         private VkIndexType _indexFormat;
 #endif
         
-        private readonly GraphicsDevice _gd;
-        private VkCommandPool _pool;
+        private  GraphicsDevice _gd;
+        private QueueType _submissionQueue;
         private VkCommandBuffer _cb;
         private bool _destroyed;
 
-        private bool _commandBufferBegun;
-        private bool _commandBufferEnded;
+        private bool _commandBufferSubmitted;
         private VkRect2D[] _scissorRects = Array.Empty<VkRect2D>();
 
         private VkClearValue[] _clearValues = Array.Empty<VkClearValue>();
@@ -71,87 +68,26 @@ namespace Veldrid
         private BoundResourceSetInfo[] _currentComputeResourceSets = Array.Empty<BoundResourceSetInfo>();
         private bool[] _computeResourceSetsChanged;
         private string _name;
-
-        private readonly object _commandBufferListLock = new object();
-        private readonly Queue<VkCommandBuffer> _availableCommandBuffers = new Queue<VkCommandBuffer>();
-        private readonly List<VkCommandBuffer> _submittedCommandBuffers = new List<VkCommandBuffer>();
-
-        private StagingResourceInfo _currentStagingInfo;
-        private readonly object _stagingLock = new object();
-        private readonly Dictionary<VkCommandBuffer, StagingResourceInfo> _submittedStagingInfos = new Dictionary<VkCommandBuffer, StagingResourceInfo>();
-        private readonly List<StagingResourceInfo> _availableStagingInfos = new List<StagingResourceInfo>();
-        private readonly List<DeviceBuffer> _availableStagingBuffers = new List<DeviceBuffer>();
-
-        internal VkCommandPool CommandPool => _pool;
+        
+        private BufferPool.Block _stagingBlock = null;
+        
+        internal QueueType SubmissionQueue => _submissionQueue;
         internal VkCommandBuffer CommandBuffer => _cb;
 
-        internal bool IsTransfer => _isTransfer;
+        private bool _longRunning = false;
+        internal bool LongRuning => _longRunning;
 
-        internal ResourceRefCount RefCount { get; }
-
-        internal CommandList(GraphicsDevice gd, ref CommandListDescription description)
-            : this(ref description, gd.Features, gd.UniformBufferMinOffsetAlignment, gd.StructuredBufferMinOffsetAlignment)
+        internal void Initialize(GraphicsDevice gd, VkCommandBuffer cb, QueueType type, bool longRunning = false)
         {
             _gd = gd;
-            var poolCI = new VkCommandPoolCreateInfo
-            {
-                sType = VkStructureType.CommandPoolCreateInfo,
-                flags = VkCommandPoolCreateFlags.ResetCommandBuffer,
-                queueFamilyIndex = description.IsTransfer ? gd.TransferQueueIndex : gd.GraphicsQueueIndex
-            };
-            VkResult result = vkCreateCommandPool(_gd.Device, &poolCI, null, out _pool);
-            CheckResult(result);
-
-            _cb = GetNextCommandBuffer();
-            RefCount = new ResourceRefCount(DisposeCore);
-        }
-        
-        internal CommandList(
-            ref CommandListDescription description,
-            GraphicsDeviceFeatures features,
-            uint uniformAlignment,
-            uint structuredAlignment)
-        {
-            _features = features;
-            _uniformBufferAlignment = uniformAlignment;
-            _structuredBufferAlignment = structuredAlignment;
-            _isTransfer = description.IsTransfer;
-        }
-
-        internal void ClearCachedState()
-        {
-            _framebuffer = null;
-            _graphicsPipeline = null;
-            _computePipeline = null;
-#if VALIDATE_USAGE
-            _indexBuffer = null;
-#endif
-        }
-
-        /// <summary>
-        /// Puts this <see cref="CommandList"/> into the initial state.
-        /// This function must be called before other graphics commands can be issued.
-        /// Begin must only be called if it has not been previously called, if <see cref="End"/> has been called,
-        /// or if <see cref="GraphicsDevice.SubmitCommands(CommandList)"/> has been called on this instance.
-        /// </summary>
-        public void Begin()
-        {
-            if (_commandBufferBegun)
-            {
-                throw new VeldridException(
-                    "CommandList must be in its initial state, or End() must have been called, for Begin() to be valid to call.");
-            }
-            if (_commandBufferEnded)
-            {
-                _commandBufferEnded = false;
-                _cb = GetNextCommandBuffer();
-                if (_currentStagingInfo != null)
-                {
-                    RecycleStagingInfo(_currentStagingInfo);
-                }
-            }
-
-            _currentStagingInfo = GetStagingResourceInfo();
+            _features = _gd.Features;
+            _uniformBufferAlignment = _gd.UniformBufferMinOffsetAlignment;
+            _structuredBufferAlignment = _gd.StructuredBufferMinOffsetAlignment;
+            _submissionQueue = type;
+            _cb = cb;
+            _longRunning = longRunning;
+            _commandBufferSubmitted = false;
+            _stagingBlock = null;
 
             var beginInfo = new VkCommandBufferBeginInfo
             {
@@ -159,7 +95,6 @@ namespace Veldrid
                 flags = VkCommandBufferUsageFlags.OneTimeSubmit
             };
             vkBeginCommandBuffer(_cb, &beginInfo);
-            _commandBufferBegun = true;
 
             ClearCachedState();
             _currentFramebuffer = null;
@@ -171,20 +106,45 @@ namespace Veldrid
             ClearSets(_currentComputeResourceSets);
         }
 
-        /// <summary>
-        /// Completes this list of graphics commands, putting it into an executable state for a <see cref="GraphicsDevice"/>.
-        /// This function must only be called after <see cref="Begin"/> has been called.
-        /// It is an error to call this function in succession, unless <see cref="Begin"/> has been called in between invocations.
-        /// </summary>
-        public void End()
+        internal void ClearCachedState()
         {
-            if (!_commandBufferBegun)
+            _framebuffer = null;
+            _graphicsPipeline = null;
+            _computePipeline = null;
+#if VALIDATE_USAGE
+            _indexBuffer = null;
+#endif
+        }
+        
+        private BufferPool.Allocation GetStagingAllocation(uint size)
+        {
+            if (size == 0)
+                throw new VeldridException("Use size > 0");
+            if (_longRunning)
+                throw new VeldridException("Async command lists should not make internal allocations");
+
+            _stagingBlock ??= _gd.GetStagingBlock(size);
+            var allocation = _stagingBlock.Allocate(size);
+            if (allocation.Mapped == IntPtr.Zero)
             {
-                throw new VeldridException("CommandBuffer must have been started before End() may be called.");
+                _stagingBlock = _gd.GetStagingBlock(size);
+                allocation = _stagingBlock.Allocate(size);
             }
 
-            _commandBufferBegun = false;
-            _commandBufferEnded = true;
+            return allocation;
+        }
+
+        /// <summary>
+        /// Called by the device before submission
+        /// </summary>
+        /// <exception cref="VeldridException"></exception>
+        internal void End()
+        {
+            if (_commandBufferSubmitted)
+            {
+                throw new VeldridException("Command Buffer already submitted");
+            }
+            _commandBufferSubmitted = true;
 
             if (!_currentFramebufferEverActive && _currentFramebuffer != null)
             {
@@ -197,7 +157,54 @@ namespace Veldrid
             }
 
             vkEndCommandBuffer(_cb);
-            _submittedCommandBuffers.Add(_cb);
+        }
+
+        public void BeginRenderPass(ref RenderPassDescription description)
+        {
+            VkRenderingAttachmentInfo* colorAttachments =
+                stackalloc VkRenderingAttachmentInfo[description.ColorAttachments.Length];
+            VkRenderingAttachmentInfo depthAttachment;
+            for (int i = 0; i < description.ColorAttachments.Length; i++)
+            {
+                var attachment = description.ColorAttachments[i];
+                colorAttachments[i] = new VkRenderingAttachmentInfo()
+                {
+                    sType = VkStructureType.RenderingAttachmentInfo,
+                    imageView = attachment.Texture.ImageView,
+                    imageLayout = VkImageLayout.AttachmentOptimal,
+                    resolveMode = VkResolveModeFlags.None,
+                    loadOp = attachment.LoadOp,
+                    storeOp = attachment.StoreOp
+                };
+            }
+            if (description.DepthStencilAttachment != null)
+            {
+                var attachment = description.DepthStencilAttachment.Value;
+                depthAttachment = new VkRenderingAttachmentInfo()
+                {
+                    sType = VkStructureType.RenderingAttachmentInfo,
+                    imageView = attachment.Texture.ImageView,
+                    imageLayout = VkImageLayout.AttachmentOptimal,
+                    resolveMode = VkResolveModeFlags.None,
+                    loadOp = attachment.LoadOp,
+                    storeOp = attachment.StoreOp
+                };
+            }
+            var renderInfo = new VkRenderingInfo()
+            {
+                sType = VkStructureType.RenderingInfo,
+                renderArea = new VkRect2D(uint.MaxValue, uint.MaxValue),
+                layerCount = 1,
+                colorAttachmentCount = (uint)description.ColorAttachments.Length,
+                pColorAttachments = colorAttachments,
+                pDepthAttachment = description.DepthStencilAttachment != null ? &depthAttachment : null
+            };
+            vkCmdBeginRendering(_cb, &renderInfo);
+        }
+
+        public void EndRenderPass()
+        {
+            vkCmdEndRendering(_cb);
         }
 
         /// <summary>
@@ -241,8 +248,6 @@ namespace Veldrid
                 vkCmdBindPipeline(_cb, VkPipelineBindPoint.Compute, pipeline.DevicePipeline);
                 _currentComputePipeline = pipeline;
             }
-
-            _currentStagingInfo.Resources.Add(pipeline.RefCount);
         }
 
         /// <summary>
@@ -285,7 +290,6 @@ namespace Veldrid
             Vortice.Vulkan.VkBuffer deviceBuffer = buffer.Buffer;
             ulong offset64 = offset;
             vkCmdBindVertexBuffers(_cb, index, 1, &deviceBuffer, &offset64);
-            _currentStagingInfo.Resources.Add(buffer.RefCount);
         }
         
         /// <summary>
@@ -324,7 +328,6 @@ namespace Veldrid
         private void SetIndexBufferCore(DeviceBuffer buffer, VkIndexType format, uint offset)
         {
             vkCmdBindIndexBuffer(_cb, buffer.Buffer, offset, format);
-            _currentStagingInfo.Resources.Add(buffer.RefCount);
         }
         
         /// <summary>
@@ -591,12 +594,6 @@ namespace Veldrid
             Util.EnsureArrayMinimumSize(ref _clearValues, clearValueCount + 1); // Leave an extra space for the depth value (tracked separately).
             Util.ClearArray(_validColorClearValues);
             Util.EnsureArrayMinimumSize(ref _validColorClearValues, clearValueCount);
-            _currentStagingInfo.Resources.Add(vkFB.RefCount);
-
-            if (fb is VkSwapchainFramebuffer scFB)
-            {
-                _currentStagingInfo.Resources.Add(scFB.Swapchain.RefCount);
-            }
         }
         
         /// <summary>
@@ -918,7 +915,6 @@ namespace Veldrid
             DrawIndirectCore(indirectBuffer, offset, drawCount, stride);
         }
 
-        // TODO: private protected
         /// <summary>
         /// </summary>
         /// <param name="indirectBuffer"></param>
@@ -928,7 +924,6 @@ namespace Veldrid
         private void DrawIndirectCore(DeviceBuffer indirectBuffer, uint offset, uint drawCount, uint stride)
         {
             PreDrawCommand();
-            _currentStagingInfo.Resources.Add(indirectBuffer.RefCount);
             vkCmdDrawIndirect(_cb, indirectBuffer.Buffer, offset, (int)drawCount, stride);
         }
         
@@ -955,7 +950,6 @@ namespace Veldrid
             DrawIndexedIndirectCore(indirectBuffer, offset, drawCount, stride);
         }
 
-        // TODO: private protected
         /// <summary>
         /// </summary>
         /// <param name="indirectBuffer"></param>
@@ -965,7 +959,6 @@ namespace Veldrid
         private void DrawIndexedIndirectCore(DeviceBuffer indirectBuffer, uint offset, uint drawCount, uint stride)
         {
             PreDrawCommand();
-            _currentStagingInfo.Resources.Add(indirectBuffer.RefCount);
             vkCmdDrawIndexedIndirect(_cb, indirectBuffer.Buffer, offset, (int)drawCount, stride);
         }
         
@@ -1044,7 +1037,6 @@ namespace Veldrid
         {
             PreDispatchCommand();
 
-            _currentStagingInfo.Resources.Add(indirectBuffer.RefCount);
             vkCmdDispatchIndirect(_cb, indirectBuffer.Buffer, offset);
         }
         
@@ -1086,9 +1078,7 @@ namespace Veldrid
             {
                 EndCurrentRenderPass();
             }
-
-            _currentStagingInfo.Resources.Add(source.RefCount);
-            _currentStagingInfo.Resources.Add(destination.RefCount);
+            
             VkImageAspectFlags aspectFlags = ((source.Usage & VkImageUsageFlags.DepthStencilAttachment) == VkImageUsageFlags.DepthStencilAttachment)
                 ? VkImageAspectFlags.Depth | VkImageAspectFlags.Stencil
                 : VkImageAspectFlags.Color;
@@ -1231,9 +1221,9 @@ namespace Veldrid
 
         private void UpdateBufferCore(DeviceBuffer buffer, uint bufferOffsetInBytes, IntPtr source, uint sizeInBytes)
         {
-            var stagingBuffer = GetStagingBuffer(sizeInBytes);
-            _gd.UpdateBuffer(stagingBuffer, 0, source, sizeInBytes);
-            CopyBuffer(stagingBuffer, 0, buffer, bufferOffsetInBytes, sizeInBytes);
+            var staging = GetStagingAllocation(sizeInBytes);
+            _gd.UpdateBuffer(staging.Buffer, (uint)staging.Offset, source, sizeInBytes);
+            CopyBuffer(staging.Buffer, (uint)staging.Offset, buffer, bufferOffsetInBytes, sizeInBytes);
         }
 
         /// <summary>
@@ -1272,120 +1262,13 @@ namespace Veldrid
             uint sizeInBytes)
         {
             EnsureNoRenderPass();
-
-            _currentStagingInfo.Resources.Add(source.RefCount);
-            _currentStagingInfo.Resources.Add(destination.RefCount);
-
             VkBufferCopy region = new VkBufferCopy
             {
                 srcOffset = sourceOffset,
                 dstOffset = destinationOffset,
                 size = sizeInBytes
             };
-
-            VkMemoryBarrier2 barrier;
-            VkBufferMemoryBarrier2 bbarrier;
-            VkDependencyInfo dependencyInfo;
-
-            // If we're doing a readback into mapped host memory, make sure the source data is able
-            // to be transferred.
-            if (source.MemoryUsage == VmaMemoryUsage.AutoPreferDevice &&
-                destination.MemoryUsage == VmaMemoryUsage.AutoPreferHost &&
-                (destination.AllocationFlags & VmaAllocationCreateFlags.Mapped) != 0)
-            {
-                bbarrier = new VkBufferMemoryBarrier2
-                {
-                    sType = VkStructureType.BufferMemoryBarrier2,
-                    srcStageMask = VkPipelineStageFlags2.AllGraphics,
-                    srcAccessMask = VkAccessFlags2.MemoryWrite | VkAccessFlags2.ShaderWrite,
-                    dstStageMask = VkPipelineStageFlags2.Transfer,
-                    dstAccessMask = VkAccessFlags2.TransferRead,
-                    srcQueueFamilyIndex = 0,
-                    dstQueueFamilyIndex = 0,
-                    buffer = source.Buffer,
-                    offset = 0,
-                    size = source.SizeInBytes
-                };
-                dependencyInfo = new VkDependencyInfo
-                {
-                    sType = VkStructureType.DependencyInfo,
-                    dependencyFlags = VkDependencyFlags.None,
-                    bufferMemoryBarrierCount = 1,
-                    pBufferMemoryBarriers = &bbarrier,
-                };
-                vkCmdPipelineBarrier2(_cb, &dependencyInfo);
-            }
-
             vkCmdCopyBuffer(_cb, source.Buffer, destination.Buffer, 1, &region);
-
-            if (source.MemoryUsage == VmaMemoryUsage.AutoPreferDevice &&
-                destination.MemoryUsage == VmaMemoryUsage.AutoPreferHost &&
-                (destination.AllocationFlags & VmaAllocationCreateFlags.Mapped) != 0)
-            {
-                bbarrier = new VkBufferMemoryBarrier2
-                {
-                    sType = VkStructureType.BufferMemoryBarrier2,
-                    srcStageMask = VkPipelineStageFlags2.Transfer,
-                    srcAccessMask = VkAccessFlags2.TransferWrite,
-                    dstStageMask = VkPipelineStageFlags2.Host,
-                    dstAccessMask = VkAccessFlags2.HostRead,
-                    srcQueueFamilyIndex = 0,
-                    dstQueueFamilyIndex = 0,
-                    buffer = destination.Buffer,
-                    offset = 0,
-                    size = source.SizeInBytes,
-                };
-                dependencyInfo = new VkDependencyInfo
-                {
-                    sType = VkStructureType.DependencyInfo,
-                    dependencyFlags = VkDependencyFlags.None,
-                    bufferMemoryBarrierCount = 1,
-                    pBufferMemoryBarriers = &bbarrier,
-                };
-                vkCmdPipelineBarrier2(_cb, &dependencyInfo);
-            }
-            else if (!IsTransfer)
-            {
-                if (destination.Usage.HasFlag(VkBufferUsageFlags.VertexBuffer))
-                {
-                    barrier = new VkMemoryBarrier2
-                    {
-                        sType = VkStructureType.MemoryBarrier2,
-                        srcStageMask = VkPipelineStageFlags2.Transfer,
-                        srcAccessMask = VkAccessFlags2.TransferWrite,
-                        dstStageMask = VkPipelineStageFlags2.VertexInput,
-                        dstAccessMask = VkAccessFlags2.VertexAttributeRead,
-                    };
-                    dependencyInfo = new VkDependencyInfo
-                    {
-                        sType = VkStructureType.DependencyInfo,
-                        dependencyFlags = VkDependencyFlags.None,
-                        memoryBarrierCount = 1,
-                        pMemoryBarriers = &barrier,
-                    };
-                    vkCmdPipelineBarrier2(_cb, &dependencyInfo);
-                }
-                else
-                {
-                    barrier = new VkMemoryBarrier2
-                    {
-                        sType = VkStructureType.MemoryBarrier2,
-                        srcStageMask = VkPipelineStageFlags2.Transfer,
-                        srcAccessMask = VkAccessFlags2.TransferWrite,
-                        dstStageMask = VkPipelineStageFlags2.DrawIndirect,
-                        //dstAccessMask = VkAccessFlags2.VertexAttributeRead;
-                        dstAccessMask = VkAccessFlags2.IndirectCommandRead,
-                    };
-                    dependencyInfo = new VkDependencyInfo
-                    {
-                        sType = VkStructureType.DependencyInfo,
-                        dependencyFlags = VkDependencyFlags.None,
-                        memoryBarrierCount = 1,
-                        pMemoryBarriers = &barrier,
-                    };
-                    vkCmdPipelineBarrier2(_cb, &dependencyInfo);
-                }
-            }
         }
         
         /// <summary>
@@ -1588,9 +1471,6 @@ namespace Veldrid
                 source, srcX, srcY, srcZ, srcMipLevel, srcBaseArrayLayer,
                 destination, dstX, dstY, dstZ, dstMipLevel, dstBaseArrayLayer,
                 width, height, depth, layerCount);
-
-            _currentStagingInfo.Resources.Add(source.RefCount);
-            _currentStagingInfo.Resources.Add(destination.RefCount);
         }
 
         /// <summary>
@@ -1611,7 +1491,6 @@ namespace Veldrid
         private void GenerateMipmapsCore(Texture texture)
         {
             EnsureNoRenderPass();
-            _currentStagingInfo.Resources.Add(texture.RefCount);
             texture.TransitionImageLayout(_cb, 0, 1, 0, texture.ArrayLayers, VkImageLayout.TransferSrcOptimal);
             texture.TransitionImageLayout(_cb, 1, texture.MipLevels - 1, 0, texture.ArrayLayers, VkImageLayout.TransferDstOptimal);
 
@@ -1661,6 +1540,129 @@ namespace Veldrid
                 texture.TransitionImageLayout(_cb, 1, texture.MipLevels - 1, 0, texture.ArrayLayers, VkImageLayout.ShaderReadOnlyOptimal);
             }
         }
+
+        public void FullBarrier()
+        {
+            Barrier(VkPipelineStageFlags2.AllCommands,
+                VkAccessFlags2.MemoryWrite,
+                VkPipelineStageFlags2.AllCommands,
+                VkAccessFlags2.MemoryWrite | VkAccessFlags2.MemoryRead);
+        }
+
+        public void PixelBarrier()
+        {
+            Barrier(
+                VkPipelineStageFlags2.ColorAttachmentOutput,
+                VkAccessFlags2.ColorAttachmentWrite,
+                VkPipelineStageFlags2.FragmentShader,
+                VkAccessFlags2.InputAttachmentRead,
+                VkDependencyFlags.ByRegion);
+        }
+
+        public void Barrier(
+            VkPipelineStageFlags2 srcStages,
+            VkAccessFlags2 srcAccess, 
+            VkPipelineStageFlags2 dstStages,
+            VkAccessFlags2 dstAccess,
+            VkDependencyFlags dependencyFlags = VkDependencyFlags.None)
+        {
+            var barrier = new VkMemoryBarrier2()
+            {
+                sType = VkStructureType.MemoryBarrier2,
+                srcStageMask = srcStages,
+                srcAccessMask = srcAccess,
+                dstStageMask = dstStages,
+                dstAccessMask = dstAccess
+            };
+            var dependencyInfo = new VkDependencyInfo()
+            {
+                sType = VkStructureType.DependencyInfo,
+                dependencyFlags = dependencyFlags,
+                memoryBarrierCount = 1,
+                pMemoryBarriers = &barrier,
+            };
+            Barrier(&dependencyInfo);
+        }
+        
+        public void Barrier(VkDependencyInfo *dependencyInfo)
+        {
+            vkCmdPipelineBarrier2(_cb, dependencyInfo);
+        }
+
+        public void BufferBarrier(
+            DeviceBuffer buffer,
+            VkPipelineStageFlags2 srcStages,
+            VkAccessFlags2 srcAccess,
+            VkPipelineStageFlags2 dstStages,
+            VkAccessFlags2 dstAccess,
+            ulong offset = 0,
+            ulong size = VK_WHOLE_SIZE)
+        {
+            var barrier = new VkBufferMemoryBarrier2()
+            {
+                sType = VkStructureType.BufferMemoryBarrier2,
+                srcStageMask = srcStages,
+                srcAccessMask = srcAccess,
+                dstStageMask = dstStages,
+                dstAccessMask = dstAccess,
+                srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                buffer = buffer.Buffer,
+                offset = offset,
+                size = size,
+            };
+            var dependencyInfo = new VkDependencyInfo()
+            {
+                sType = VkStructureType.DependencyInfo,
+                bufferMemoryBarrierCount = 1,
+                pBufferMemoryBarriers = &barrier,
+            };
+            Barrier(&dependencyInfo);
+        }
+
+        public void ImageBarrier(
+            Texture texture,
+            VkImageLayout oldLayout,
+            VkImageLayout newLayout,
+            VkPipelineStageFlags2 srcStages,
+            VkAccessFlags2 srcAccess,
+            VkPipelineStageFlags2 dstStages,
+            VkAccessFlags2 dstAccess)
+        {
+            VkImageAspectFlags aspectMask = VkImageAspectFlags.Color;
+            if ((texture.Usage & VkImageUsageFlags.DepthStencilAttachment) != 0)
+            {
+                aspectMask = FormatHelpers.IsStencilFormat(texture.Format)
+                    ? VkImageAspectFlags.Depth | VkImageAspectFlags.Stencil
+                    : VkImageAspectFlags.Depth;
+            }
+            var barrier = new VkImageMemoryBarrier2()
+            {
+                sType = VkStructureType.ImageMemoryBarrier2,
+                srcAccessMask = srcAccess,
+                srcStageMask = srcStages,
+                dstAccessMask = dstAccess,
+                dstStageMask = dstStages,
+                oldLayout = oldLayout,
+                newLayout = newLayout,
+                srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                image = texture.OptimalDeviceImage,
+                subresourceRange = new VkImageSubresourceRange()
+                {
+                    aspectMask = aspectMask,
+                    levelCount = texture.MipLevels,
+                    layerCount = texture.ArrayLayers,
+                }
+            };
+            var dependencyInfo = new VkDependencyInfo()
+            {
+                sType = VkStructureType.DependencyInfo,
+                imageMemoryBarrierCount = 1,
+                pImageMemoryBarriers = &barrier,
+            };
+            Barrier(&dependencyInfo);
+        }
         
         /// <summary>
         /// Pushes a debug group at the current position in the <see cref="CommandList"/>. This allows subsequent commands to be
@@ -1676,8 +1678,8 @@ namespace Veldrid
 
         private void PushDebugGroupCore(string name)
         {
-            vkCmdDebugMarkerBeginEXT_t func = _gd.MarkerBegin;
-            if (func == null) { return; }
+            if (!_gd.DebugLabelsEnabled)
+                return;
 
             int byteCount = Encoding.UTF8.GetByteCount(name);
             sbyte* utf8Ptr = stackalloc sbyte[byteCount + 1];
@@ -1687,13 +1689,13 @@ namespace Veldrid
             }
             utf8Ptr[byteCount] = 0;
 
-            var markerInfo = new VkDebugMarkerMarkerInfoEXT
+            var labelInfo = new VkDebugUtilsLabelEXT()
             {
-                sType = VkStructureType.DebugMarkerMarkerInfoEXT,
-                pMarkerName = utf8Ptr
+                sType = VkStructureType.DebugUtilsLabelEXT,
+                pLabelName = utf8Ptr
             };
 
-            func(_cb, &markerInfo);
+            vkCmdBeginDebugUtilsLabelEXT(_cb, &labelInfo);
         }
         
         /// <summary>
@@ -1707,10 +1709,8 @@ namespace Veldrid
 
         private void PopDebugGroupCore()
         {
-            vkCmdDebugMarkerEndEXT_t func = _gd.MarkerEnd;
-            if (func == null) { return; }
-
-            func(_cb);
+            if (_gd.DebugLabelsEnabled)
+                vkCmdEndDebugUtilsLabelEXT(_cb);
         }
         /// <summary>
         /// Inserts a debug marker into the CommandList at the current position. This is used by graphics debuggers to identify
@@ -1724,8 +1724,8 @@ namespace Veldrid
 
         private void InsertDebugMarkerCore(string name)
         {
-            vkCmdDebugMarkerInsertEXT_t func = _gd.MarkerInsert;
-            if (func == null) { return; }
+            if (!_gd.DebugLabelsEnabled)
+                return;
 
             int byteCount = Encoding.UTF8.GetByteCount(name);
             sbyte* utf8Ptr = stackalloc sbyte[byteCount + 1];
@@ -1735,13 +1735,13 @@ namespace Veldrid
             }
             utf8Ptr[byteCount] = 0;
 
-            VkDebugMarkerMarkerInfoEXT markerInfo = new VkDebugMarkerMarkerInfoEXT
+            var labelInfo = new VkDebugUtilsLabelEXT()
             {
-                sType = VkStructureType.DebugMarkerMarkerInfoEXT,
-                pMarkerName = utf8Ptr
+                sType = VkStructureType.DebugUtilsLabelEXT,
+                pLabelName = utf8Ptr
             };
 
-            func(_cb, &markerInfo);
+            vkCmdInsertDebugUtilsLabelEXT(_cb, &labelInfo);
         }
         
         /// <summary>
@@ -1756,72 +1756,6 @@ namespace Veldrid
                 _name = value;
                 _gd.SetResourceName(this, value);
             }
-        }
-        
-        private VkCommandBuffer GetNextCommandBuffer()
-        {
-            lock (_commandBufferListLock)
-            {
-                if (_availableCommandBuffers.Count > 0)
-                {
-                    VkCommandBuffer cachedCB = _availableCommandBuffers.Dequeue();
-                    VkResult resetResult = vkResetCommandBuffer(cachedCB, VkCommandBufferResetFlags.None);
-                    CheckResult(resetResult);
-                    return cachedCB;
-                }
-            }
-
-            var cbAI = new VkCommandBufferAllocateInfo
-            {
-                sType = VkStructureType.CommandBufferAllocateInfo,
-                commandPool = _pool,
-                commandBufferCount = 1,
-                level = VkCommandBufferLevel.Primary
-            };
-            VkCommandBuffer cb = new VkCommandBuffer();
-            VkResult result = vkAllocateCommandBuffers(_gd.Device, &cbAI, &cb);
-            CheckResult(result);
-            return cb;
-        }
-
-        public void CommandBufferSubmitted(VkCommandBuffer cb)
-        {
-            RefCount.Increment();
-            foreach (ResourceRefCount rrc in _currentStagingInfo.Resources)
-            {
-                rrc.Increment();
-            }
-
-            _submittedStagingInfos.Add(cb, _currentStagingInfo);
-            _currentStagingInfo = null;
-        }
-
-        public void CommandBufferCompleted(VkCommandBuffer completedCB)
-        {
-            lock (_commandBufferListLock)
-            {
-                for (int i = 0; i < _submittedCommandBuffers.Count; i++)
-                {
-                    VkCommandBuffer submittedCB = _submittedCommandBuffers[i];
-                    if (submittedCB == completedCB)
-                    {
-                        _availableCommandBuffers.Enqueue(completedCB);
-                        _submittedCommandBuffers.RemoveAt(i);
-                        i -= 1;
-                    }
-                }
-            }
-
-            lock (_stagingLock)
-            {
-                if (_submittedStagingInfos.TryGetValue(completedCB, out StagingResourceInfo info))
-                {
-                    RecycleStagingInfo(info);
-                    _submittedStagingInfos.Remove(completedCB);
-                }
-            }
-
-            RefCount.Decrement();
         }
 
         private void PreDrawCommand()
@@ -1874,13 +1808,6 @@ namespace Veldrid
                     {
                         dynamicOffsets[currentBatchDynamicOffsetCount] = curSetOffsets.Get(i);
                         currentBatchDynamicOffsetCount += 1;
-                    }
-
-                    // Increment ref count on first use of a set.
-                    _currentStagingInfo.Resources.Add(vkSet.RefCount);
-                    foreach (ResourceRefCount refCount in vkSet.RefCounts)
-                    {
-                        _currentStagingInfo.Resources.Add(refCount);
                     }
                 }
 
@@ -2355,111 +2282,14 @@ namespace Veldrid
             }
         }
 
-        private DeviceBuffer GetStagingBuffer(uint size)
-        {
-            lock (_stagingLock)
-            {
-                DeviceBuffer ret = null;
-                foreach (var buffer in _availableStagingBuffers)
-                {
-                    if (buffer.SizeInBytes >= size)
-                    {
-                        ret = buffer;
-                        _availableStagingBuffers.Remove(buffer);
-                        break; ;
-                    }
-                }
-                if (ret == null)
-                {
-                    ret = _gd.ResourceFactory.CreateBuffer(
-                        new BufferDescription(
-                            size,
-                            VkBufferUsageFlags.None,
-                            VmaMemoryUsage.AutoPreferHost,
-                            VmaAllocationCreateFlags.Mapped));
-                    ret.Name = $"Staging Buffer (CommandList {_name})";
-                }
-
-                _currentStagingInfo.BuffersUsed.Add(ret);
-                return ret;
-            }
-        }
-        
-        /// <summary>
-        /// Frees unmanaged device resources controlled by this instance.
-        /// </summary>
-        public void Dispose()
-        {
-            RefCount.Decrement();
-        }
-
-        private void DisposeCore()
+        internal void Dispose()
         {
             if (!_destroyed)
             {
                 _destroyed = true;
-                vkDestroyCommandPool(_gd.Device, _pool, null);
-
-                Debug.Assert(_submittedStagingInfos.Count == 0);
-
-                foreach (var buffer in _availableStagingBuffers)
-                {
-                    buffer.Dispose();
-                }
-            }
-        }
-        
-        private class StagingResourceInfo
-        {
-            public List<DeviceBuffer> BuffersUsed { get; } = new List<DeviceBuffer>();
-            public HashSet<ResourceRefCount> Resources { get; } = new HashSet<ResourceRefCount>();
-            public void Clear()
-            {
-                BuffersUsed.Clear();
-                Resources.Clear();
             }
         }
 
-        private StagingResourceInfo GetStagingResourceInfo()
-        {
-            lock (_stagingLock)
-            {
-                StagingResourceInfo ret;
-                int availableCount = _availableStagingInfos.Count;
-                if (availableCount > 0)
-                {
-                    ret = _availableStagingInfos[availableCount - 1];
-                    _availableStagingInfos.RemoveAt(availableCount - 1);
-                }
-                else
-                {
-                    ret = new StagingResourceInfo();
-                }
-
-                return ret;
-            }
-        }
-
-        private void RecycleStagingInfo(StagingResourceInfo info)
-        {
-            lock (_stagingLock)
-            {
-                foreach (var buffer in info.BuffersUsed)
-                {
-                    _availableStagingBuffers.Add(buffer);
-                }
-
-                foreach (ResourceRefCount rrc in info.Resources)
-                {
-                    rrc.Decrement();
-                }
-
-                info.Clear();
-
-                _availableStagingInfos.Add(info);
-            }
-        }
-        
         [Conditional("VALIDATE_USAGE")]
         private void ValidateIndexBuffer(uint indexCount)
         {

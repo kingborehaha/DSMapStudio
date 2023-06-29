@@ -311,8 +311,7 @@ namespace Veldrid
         /// <returns></returns>
         protected virtual DeviceBuffer CreateBufferCore(ref BufferDescription description)
         {
-            return new DeviceBuffer(
-                _gd, 
+            return _gd.CreateBuffer(
                 description.SizeInBytes, 
                 description.Usage,
                 description.MemoryUsage,
@@ -372,23 +371,16 @@ namespace Veldrid
         /// Creates a new <see cref="CommandList"/>.
         /// </summary>
         /// <returns>A new <see cref="CommandList"/>.</returns>
-        public CommandList CreateCommandList() => CreateCommandList(new CommandListDescription(false));
-        
-        /// <summary>
-        /// Creates a new <see cref="CommandList"/>.
-        /// </summary>
-        /// <param name="description">The desired properties of the created object.</param>
-        /// <returns>A new <see cref="CommandList"/>.</returns>
-        public CommandList CreateCommandList(CommandListDescription description) => CreateCommandList(ref description);
+        public CommandList CreateCommandList() => CreateCommandList(QueueType.Graphics);
 
         /// <summary>
         /// Creates a new <see cref="CommandList"/>.
         /// </summary>
         /// <param name="description">The desired properties of the created object.</param>
         /// <returns>A new <see cref="CommandList"/>.</returns>
-        public virtual CommandList CreateCommandList(ref CommandListDescription description)
+        public virtual CommandList CreateCommandList(QueueType type)
         {
-            return new CommandList(_gd, ref description);
+            return _gd.GetCommandList(type);
         }
 
         /// <summary>
