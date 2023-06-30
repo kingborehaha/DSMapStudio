@@ -382,11 +382,24 @@ namespace StudioCore.ParamEditor
             // Load regulation params first, as game prioritizes them
             if (settings.TargetRegulationPath != "")
             {
-                LoadParamsACFAFromFileRelativePath($@"param\regulation.bin", false);
+                if (settings.InnerRegulationBinName != "")
+                {
+                    var reg = BND3.Read(settings.TargetRegulationPath);
+                    var innerBin = reg.Files.Find(e => e.Name == settings.InnerRegulationBinName);
+                    if (innerBin == null)
+                    {
+                        throw new Exception("Inner regulation could not be found within target regulation.bin");
+                    }
+                    LoadParamFromBinder(BND3.Read(innerBin.Bytes), ref _params, out _paramVersion);
+                }
+                else
+                {
+                    LoadParamsACFAFromFile(settings.TargetRegulationPath);
+                }
             }
             else
             {
-                LoadParamsACFAFromFile(settings.TargetRegulationPath);
+                LoadParamsACFAFromFileRelativePath($@"param\regulation.bin", false);
             }
 
             foreach (var path in Directory.GetFiles($@"{dir}\bind\event", "*event.bnd"))
@@ -1509,7 +1522,7 @@ namespace StudioCore.ParamEditor
         {
             var dir = AssetLocator.GameRootDirectory;
             var mod = AssetLocator.GameModDirectory;
-            string regPath = "";
+            string regPath;
 
             // regulation.bin
             if (settings.TargetRegulationPath != "")
@@ -1532,24 +1545,36 @@ namespace StudioCore.ParamEditor
             }
 
             BND3 regulation = BND3.Read(regPath);
-            foreach (var p in regulation.Files)
+            if (settings.InnerRegulationBinName != "")
             {
-                if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
+                var innerBin = regulation.Files.Find(e => e.Name == settings.InnerRegulationBinName);
+                if (innerBin == null)
                 {
-                    p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
+                    throw new Exception("Inner regulation could not be found within target regulation.bin");
                 }
-            }
-
-            if (settings.TargetRegulationPath != "")
-            {
+                var innerBnd = BND3.Read(innerBin.Bytes);
+                foreach (var p in innerBnd.Files)
+                {
+                    if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
+                    {
+                        p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
+                    }
+                }
                 var regName = Path.GetFileNameWithoutExtension(settings.TargetRegulationPath);
-                Utils.WriteWithBackup(null, mod, $@"\param\{regName}.bin", regulation);
+                innerBin.Bytes = innerBnd.Write();
+                Utils.WriteWithBackup(null, mod, $@"\TargetRegulation\{regName}.bin", regulation);
             }
             else
             {
+                foreach (var p in regulation.Files)
+                {
+                    if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
+                    {
+                        p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
+                    }
+                }
                 Utils.WriteWithBackup(dir, mod, $@"\param\regulation.bin", regulation);
             }
-
 
             // boot.bnd
             var bndPath = $@"{mod}\bind\boot.bnd";

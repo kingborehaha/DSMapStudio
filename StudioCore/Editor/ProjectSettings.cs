@@ -28,7 +28,10 @@ namespace StudioCore.Editor
         public List<string> PinnedParams { get; set; } = new List<string>();
         public Dictionary<string, List<int>> PinnedRows { get; set; } = new Dictionary<string, List<int>>();
         public Dictionary<string, List<string>> PinnedFields { get; set; } = new Dictionary<string, List<string>>();
+        // Path to regulation.bin to load. Currently only used by ACFA
         public string TargetRegulationPath { get; set; } = "";
+        // Path to .bin to load within regulation.bin. Currently only used by ACFA
+        public string InnerRegulationBinName { get; set; } = "";
 
         /// <summary>
         /// Has different meanings depending on the game, but for supported games

@@ -52,6 +52,8 @@ namespace StudioCore
         private bool _showImGuiDebugLogWindow = false;
         private bool _showImGuiStackToolWindow = false;
 
+        private string[] _regulationItems;
+
         public unsafe MapStudioNew(IGraphicsContext context)
         {
             // Hack to make sure dialogs work before the main window is created
@@ -1154,8 +1156,9 @@ namespace StudioCore
                     ImGui.Text("Target regulation: ");
                     ImGui.SameLine();
                     Utils.ImGuiGenericHelpPopup("?", "##Help_AcfaTargetReg",
-                        "Optional. Used for non-standard regulation. If left empty, \"param\\regulation.bin\" is used.\n" +
-                        "Target regulation saves to \"param\\X.bin\".\nTarget regulation can be changed at any time in project settings.");
+                        "Optional. Used for non-default regulation. If left empty, \"param\\regulation.bin\" is used.\n" +
+                        "Regulation.bin will be saved to \"TargetRegulation\" folder.\n" +
+                        "Target regulation can be changed at any time in project settings.");
                     ImGui.SameLine();
                     var regName = _newProjectOptions.settings.TargetRegulationPath;
                     if (ImGui.InputText("##acfaReg", ref regName, 255))
@@ -1176,7 +1179,48 @@ namespace StudioCore
 
                         if (browseDlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                         {
-                            _newProjectOptions.settings.TargetRegulationPath = browseDlg.FileName;
+                            if (File.Exists(browseDlg.FileName))
+                            {
+                                _newProjectOptions.settings.TargetRegulationPath = browseDlg.FileName;
+                                try
+                                {
+                                    _regulationItems = Utils.GetFileNamesFromBnd(SoulsFormats.BND3.Read(browseDlg.FileName), ".bin");
+                                }
+                                catch(Exception e)
+                                {
+                                    TaskManager.warningList.TryAdd("ACFA inner reg error", $"Unable to load regulation.bin: {e.Message}");
+                                    _newProjectOptions.settings.TargetRegulationPath = "";
+                                }
+                            }
+                        }
+                    }
+
+                    if (_newProjectOptions.settings.TargetRegulationPath != "" && _regulationItems != null)
+                    {
+                        // Inner regulation
+                        if (_regulationItems.Length == 0)
+                        {
+                            ImGui.Text("No inner regulation could be found in target regulation.bin.");
+                        }
+                        else
+                        {
+                            ImGui.AlignTextToFramePadding();
+                            ImGui.Text($@"Inner regulation:  ");
+                            ImGui.SameLine();
+                            Utils.ImGuiGenericHelpPopup("?", "##Help_AcfaInnerReg",
+                                "Necessary if target regulation is defined. Determines which .bin within target regulation.bin to use.\n" +
+                                "Inner regulation can be changed at any time in project settings.");
+                            ImGui.SameLine();
+                            int comboIndex = Array.IndexOf(_regulationItems, _newProjectOptions.settings.InnerRegulationBinName);
+                            if (comboIndex == -1)
+                            {
+                                _newProjectOptions.settings.InnerRegulationBinName = _regulationItems[0];
+                                comboIndex = 0;
+                            }
+                            if (ImGui.Combo("##InnerRegCombo", ref comboIndex, _regulationItems, _regulationItems.Length))
+                            {
+                                _newProjectOptions.settings.InnerRegulationBinName = _regulationItems[comboIndex];
+                            }
                         }
                     }
                 }
@@ -1215,6 +1259,19 @@ namespace StudioCore
                                          MessageBoxButtons.OK,
                                          MessageBoxIcon.None);
                         validated = false;
+                    }
+                    if (validated && _newProjectOptions.settings.GameType == GameType.ArmoredCoreForAnswer)
+                    {
+                        if (_newProjectOptions.settings.TargetRegulationPath != "")
+                        {
+                            if (!File.Exists(_newProjectOptions.settings.TargetRegulationPath))
+                            {
+                                PlatformUtils.Instance.MessageBox("Target regulation.bin does not exist.", "Error",
+                                                 MessageBoxButtons.OK,
+                                                 MessageBoxIcon.None);
+                                validated = false;
+                            }
+                        }
                     }
                     if (validated && (_newProjectOptions.directory == null || !Directory.Exists(_newProjectOptions.directory)))
                     {

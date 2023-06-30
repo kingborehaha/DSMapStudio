@@ -832,5 +832,18 @@ namespace StudioCore
             }
             return text;
         }
+
+        public static string[] GetFileNamesFromBnd(IBinder bnd, string fileExt)
+        {
+            List<string> items = new();
+            foreach (var file in bnd.Files)
+            {
+                if (file.Name.ToLower().EndsWith(fileExt.ToLower()))
+                { 
+                    items.Add(file.Name);
+                }
+            }
+            return items.ToArray();
+        }
     }
 }

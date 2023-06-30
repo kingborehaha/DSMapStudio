@@ -17,12 +17,12 @@ namespace StudioCore
         public bool FontRebuildRequest = false;
 
         private KeyBind _currentKeyBind;
+        private string[] _regulationItems;
         public Editor.ProjectSettings? ProjSettings = null;
         public MsbEditor.MsbEditorScreen MsbEditor;
         public MsbEditor.ModelEditorScreen ModelEditor;
         public ParamEditor.ParamEditorScreen ParamEditor;
         public TextEditor.TextEditorScreen TextEditor;
-
         public SettingsMenu()
         {
         }
@@ -157,30 +157,42 @@ namespace StudioCore
                         {
                             ProjSettings.PartialParams = usepartial;
                         }
-
+                        
                         string regPath = ProjSettings.TargetRegulationPath;
                         if (ProjSettings.GameType is GameType.ArmoredCoreForAnswer)
                         {
                             ImGui.AlignTextToFramePadding();
-                            ImGui.Text("Target regulation:          ");
+                            ImGui.Text("Target regulation:");
                             ImGui.SameLine();
                             Utils.ImGuiGenericHelpPopup("?", "##Help_AcfaTargetReg",
-                                "Optional. Used for non-standard regulation. If left empty, \"param\\regulation.bin\" is used.\n" +
-                                "Target regulation saves to \"param\\X.bin\".");
+                                "Optional. Used for non-default regulation. If left empty, \"param\\regulation.bin\" is used.\n" +
+                                "Regulation.bin will be saved to \"TargetRegulation\" folder.\n" +
+                                "Target regulation can be changed at any time in project settings.");
                             ImGui.SameLine();
-                            if (ImGui.Button($@"{ForkAwesome.FileO}##fd3"))
+                            var regName = ProjSettings.TargetRegulationPath;
+                            if (ImGui.InputText("##acfaReg", ref regName, 255))
                             {
-                                var browseDlg = new System.Windows.Forms.FolderBrowserDialog();
-                                browseDlg.InitialDirectory = ProjSettings.GameRoot;
+                                ProjSettings.TargetRegulationPath = regName;
+                            }
+                            ImGui.SameLine();
+                            if (ImGui.Button($@"{ForkAwesome.FileO}##acfafd"))
+                            {
+                                var browseDlg = new System.Windows.Forms.OpenFileDialog()
+                                {
+                                    Filter = "ACFA Regulation (.BIN) |*.BIN*|" +
+                                        "All Files|*.*",
+                                    ValidateNames = true,
+                                    CheckFileExists = true,
+                                    CheckPathExists = true,
+                                };
+
                                 if (browseDlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                                 {
-                                    regPath = browseDlg.SelectedPath;
-                                    Debugger.Break();
+                                    regPath = browseDlg.FileName;
                                 }
                             }
                             if (regPath != ProjSettings.TargetRegulationPath)
                             {
-                                Debugger.Break();
                                 if (System.IO.File.Exists(ProjSettings.TargetRegulationPath))
                                 {
                                     ProjSettings.TargetRegulationPath = regPath;
@@ -188,9 +200,39 @@ namespace StudioCore
                                 }
                                 else
                                 {
-                                    System.Windows.Forms.MessageBox.Show("Your target regulation does not exist. Please select a valid regulation.", "Error",
+                                    ProjSettings.TargetRegulationPath = "";
+                                    System.Windows.Forms.MessageBox.Show("Target regulation does not exist. Please select a valid regulation.", "Error",
                                         System.Windows.Forms.MessageBoxButtons.OK,
                                         System.Windows.Forms.MessageBoxIcon.None);
+                                }
+                            }
+
+                            if (ProjSettings.TargetRegulationPath != "" && _regulationItems != null)
+                            {
+                                // Inner regulation
+                                if (_regulationItems.Length == 0)
+                                {
+                                    ImGui.Text("No inner regulation could be found in target regulation.bin.");
+                                }
+                                else
+                                {
+                                    ImGui.AlignTextToFramePadding();
+                                    ImGui.Text($@"Inner regulation:");
+                                    ImGui.SameLine();
+                                    Utils.ImGuiGenericHelpPopup("?", "##Help_AcfaInnerReg",
+                                        "Necessary if target regulation is defined. Determines which .bin within target regulation.bin to use.");
+                                    ImGui.SameLine();
+                                    int comboIndex = Array.IndexOf(_regulationItems, ProjSettings.InnerRegulationBinName);
+                                    if (comboIndex == -1)
+                                    {
+                                        ProjSettings.InnerRegulationBinName = _regulationItems[0];
+                                        comboIndex = 0;
+                                    }
+                                    if (ImGui.Combo("##InnerRegCombo", ref comboIndex, _regulationItems, _regulationItems.Length))
+                                    {
+                                        ProjSettings.InnerRegulationBinName = _regulationItems[comboIndex];
+                                        StudioCore.ParamEditor.ParamBank.ReloadParams(ProjSettings);
+                                    }
                                 }
                             }
                         }
