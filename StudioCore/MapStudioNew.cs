@@ -1157,23 +1157,19 @@ namespace StudioCore
                     ImGui.SameLine();
                     if (ImGui.Button($@"{ForkAwesome.FileO}##fd3"))
                     {
-                        var browseDlg = new System.Windows.Forms.OpenFileDialog()
-                        {
-                            Filter = "ACFA Regulation (.BIN) |*.BIN*|" +
-                                "All Files|*.*",
-                            ValidateNames = true,
-                            CheckFileExists = true,
-                            CheckPathExists = true,
-                        };
+                        using FileChooserNative fileChooser = new FileChooserNative($"Select target regulation.bin...",
+                            null, FileChooserAction.Open, "Open", "Cancel");
+                        fileChooser.AddFilter(_assetLocator.AllFilesFilter);
+                        fileChooser.AddFilter(_assetLocator.RegulationBinGenericFilter);
 
-                        if (browseDlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                        if (fileChooser.Run() == (int)ResponseType.Accept)
                         {
-                            if (File.Exists(browseDlg.FileName))
+                            if (File.Exists(fileChooser.Filename))
                             {
-                                _newProjectOptions.settings.TargetRegulationPath = browseDlg.FileName;
+                                _newProjectOptions.settings.TargetRegulationPath = fileChooser.Filename;
                                 try
                                 {
-                                    _regulationItems = Utils.GetFileNamesFromBnd(SoulsFormats.BND3.Read(browseDlg.FileName), ".bin");
+                                    _regulationItems = Utils.GetFileNamesFromBnd(fileChooser.Filename, ".bin");
                                 }
                                 catch(Exception e)
                                 {

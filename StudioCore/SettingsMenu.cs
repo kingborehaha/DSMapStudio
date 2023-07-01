@@ -7,7 +7,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using Gtk;
 using Veldrid;
+using StudioCore.Platform;
 
 namespace StudioCore
 {
@@ -177,33 +179,24 @@ namespace StudioCore
                             ImGui.SameLine();
                             if (ImGui.Button($@"{ForkAwesome.FileO}##acfafd"))
                             {
-                                var browseDlg = new System.Windows.Forms.OpenFileDialog()
-                                {
-                                    Filter = "ACFA Regulation (.BIN) |*.BIN*|" +
-                                        "All Files|*.*",
-                                    ValidateNames = true,
-                                    CheckFileExists = true,
-                                    CheckPathExists = true,
-                                };
+                                using FileChooserNative fileChooser = new FileChooserNative($"Select target regulation.bin...",
+                                    null, FileChooserAction.Open, "Open", "Cancel");
+                                fileChooser.AddFilter(MsbEditor.AssetLocator.AllFilesFilter);
+                                fileChooser.AddFilter(MsbEditor.AssetLocator.RegulationBinGenericFilter);
 
-                                if (browseDlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                                if (fileChooser.Run() == (int)ResponseType.Accept)
                                 {
-                                    regPath = browseDlg.FileName;
-                                }
-                            }
-                            if (regPath != ProjSettings.TargetRegulationPath)
-                            {
-                                if (System.IO.File.Exists(ProjSettings.TargetRegulationPath))
-                                {
-                                    ProjSettings.TargetRegulationPath = regPath;
-                                    StudioCore.ParamEditor.ParamBank.ReloadParams(ProjSettings);
-                                }
-                                else
-                                {
-                                    ProjSettings.TargetRegulationPath = "";
-                                    System.Windows.Forms.MessageBox.Show("Target regulation does not exist. Please select a valid regulation.", "Error",
-                                        System.Windows.Forms.MessageBoxButtons.OK,
-                                        System.Windows.Forms.MessageBoxIcon.None);
+                                    ProjSettings.TargetRegulationPath = fileChooser.Filename;
+                                    try
+                                    {
+                                        _regulationItems = Utils.GetFileNamesFromBnd(fileChooser.Filename, ".bin");
+                                        StudioCore.ParamEditor.ParamBank.ReloadParams(ProjSettings);
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        TaskManager.warningList.TryAdd("ACFA inner reg error", $"Unable to load regulation.bin: {e.Message}");
+                                        ProjSettings.TargetRegulationPath = "";
+                                    }
                                 }
                             }
 
@@ -451,7 +444,7 @@ namespace StudioCore
                     if (_currentKeyBind == bindVal)
                     {
                         ImGui.Button("Press Key <Esc - Clear>");
-                        if (InputTracker.GetKeyDown(Key.Escape))
+                        if (InputTracker.GetKeyDown(Veldrid.Key.Escape))
                         {
                             bind.SetValue(KeyBindings.Current, new KeyBind());
                             _currentKeyBind = null;

@@ -839,16 +839,31 @@ namespace StudioCore
             return text;
         }
 
-        public static string[] GetFileNamesFromBnd(IBinder bnd, string fileExt)
+        public static string[] GetFileNamesFromBnd(string path, string fileExtFilter)
         {
+            IBinder bnd;
+            if (BND3.Is(path))
+            {
+                bnd = BND3.Read(path);
+            }
+            else if (BND4.Is(path))
+            {
+                bnd = BND4.Read(path);
+            }
+            else
+            {
+                throw new NotSupportedException("Unsupported file type");
+            }
+
             List<string> items = new();
             foreach (var file in bnd.Files)
             {
-                if (file.Name.ToLower().EndsWith(fileExt.ToLower()))
+                if (file.Name.ToLower().EndsWith(fileExtFilter.ToLower()))
                 { 
                     items.Add(file.Name);
                 }
             }
+            bnd.Dispose();
             return items.ToArray();
         }
     }

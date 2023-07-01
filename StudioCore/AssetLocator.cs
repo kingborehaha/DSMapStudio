@@ -78,6 +78,7 @@ namespace StudioCore
         public readonly FileFilter GameExecutableFilter;
         public readonly FileFilter ProjectJsonFilter;
         public readonly FileFilter RegulationBinFilter;
+        public readonly FileFilter RegulationBinGenericFilter;
         public readonly FileFilter Data0Filter;
         public readonly FileFilter ParamBndDcxFilter;
         public readonly FileFilter ParamBndFilter;
@@ -109,6 +110,8 @@ namespace StudioCore
             ProjectJsonFilter.AddPattern("project.json");
             RegulationBinFilter = new FileFilter { Name = "Regulation file (regulation.bin)" };
             RegulationBinFilter.AddPattern("regulation.bin");
+            RegulationBinGenericFilter = new FileFilter { Name = "Regulation file (*.BIN)" };
+            RegulationBinGenericFilter.AddPattern("*.bin");
             Data0Filter = new FileFilter { Name = "Data file (Data0.bdt)" };
             Data0Filter.AddPattern("data0.bdt");
             ParamBndDcxFilter = new FileFilter { Name = "Compressed params (gameparam.parambnd.dcx)" };
