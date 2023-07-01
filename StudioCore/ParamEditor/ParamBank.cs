@@ -370,7 +370,8 @@ namespace StudioCore.ParamEditor
         }
         private void LoadParamsDESFromFile(string path)
         {
-            LoadParamFromBinder(BND3.Read(path), ref _params, out _paramVersion);
+            using var bnd = BND3.Read(path);
+            LoadParamFromBinder(bnd, ref _params, out _paramVersion);
         }
 
         private void LoadParamsACFA(ProjectSettings settings)
@@ -533,7 +534,8 @@ namespace StudioCore.ParamEditor
         }
         private void LoadParamsDS1FromFile(string path)
         {
-            LoadParamFromBinder(BND3.Read(path), ref _params, out _paramVersion);
+            using var bnd = BND3.Read(path);
+            LoadParamFromBinder(bnd, ref _params, out _paramVersion);
         }
 
         private void LoadParamsDS1R()
@@ -589,7 +591,8 @@ namespace StudioCore.ParamEditor
         }
         private void LoadParamsDS1RFromFile(string path)
         {
-            LoadParamFromBinder(BND3.Read(path), ref _params, out _paramVersion);
+            using var bnd = BND3.Read(path);
+            LoadParamFromBinder(bnd, ref _params, out _paramVersion);
         }
 
         private void LoadParamsBBSekiro()
@@ -617,7 +620,8 @@ namespace StudioCore.ParamEditor
         }
         private void LoadParamsBBSekiroFromFile(string path)
         {
-            LoadParamFromBinder(BND4.Read(path), ref _params, out _paramVersion);
+            using var bnd = BND4.Read(path);
+            LoadParamFromBinder(bnd, ref _params, out _paramVersion);
         }
 
         /// <summary>
@@ -768,6 +772,7 @@ namespace StudioCore.ParamEditor
                     }
                 }
             }
+            paramBnd.Dispose();
         }
 
         private void LoadParamsDS3(bool loose)
@@ -803,7 +808,7 @@ namespace StudioCore.ParamEditor
         }
         private void LoadParamsDS3FromFile(string path, bool isLoose)
         {
-            BND4 lparamBnd = isLoose ? BND4.Read(path) : SFUtil.DecryptDS3Regulation(path);
+            using var lparamBnd = isLoose ? BND4.Read(path) : SFUtil.DecryptDS3Regulation(path);
             LoadParamFromBinder(lparamBnd, ref _params, out _paramVersion);
         }
 
@@ -829,7 +834,7 @@ namespace StudioCore.ParamEditor
             param = $@"{mod}\regulation.bin";
             if (partial && File.Exists(param))
             {
-                BND4 pParamBnd = SFUtil.DecryptERRegulation(param);
+                using var pParamBnd = SFUtil.DecryptERRegulation(param);
                 Dictionary<string, Param> cParamBank = new Dictionary<string, Param>();
                 ulong v;
                 LoadParamFromBinder(pParamBnd, ref cParamBank, out v, true);
@@ -1162,7 +1167,7 @@ namespace StudioCore.ParamEditor
             {
                 param = $@"{dir}\param\GameParam\GameParam.parambnd";
             }
-            BND3 paramBnd = BND3.Read(param);
+            using var paramBnd = BND3.Read(param);
 
             // Replace params with edited ones
             foreach (var p in paramBnd.Files)
@@ -1179,15 +1184,15 @@ namespace StudioCore.ParamEditor
             {
                 foreach (var bnd in Directory.GetFiles($@"{AssetLocator.GameRootDirectory}\param\DrawParam", "*.parambnd"))
                 {
-                    paramBnd = BND3.Read(bnd);
-                    foreach (var p in paramBnd.Files)
+                    using var drawParamBnd = BND3.Read(bnd);
+                    foreach (var p in drawParamBnd.Files)
                     {
                         if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
                         {
                             p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
                         }
                     }
-                    Utils.WriteWithBackup(dir, mod, @$"param\DrawParam\{Path.GetFileName(bnd)}", paramBnd);
+                    Utils.WriteWithBackup(dir, mod, @$"param\DrawParam\{Path.GetFileName(bnd)}", drawParamBnd);
                 }
             }
         }
@@ -1207,7 +1212,7 @@ namespace StudioCore.ParamEditor
             {
                 param = $@"{dir}\param\GameParam\GameParam.parambnd.dcx";
             }
-            BND3 paramBnd = BND3.Read(param);
+            using var paramBnd = BND3.Read(param);
 
             // Replace params with edited ones
             foreach (var p in paramBnd.Files)
@@ -1224,15 +1229,15 @@ namespace StudioCore.ParamEditor
             {
                 foreach (var bnd in Directory.GetFiles($@"{AssetLocator.GameRootDirectory}\param\DrawParam", "*.parambnd.dcx"))
                 {
-                    paramBnd = BND3.Read(bnd);
-                    foreach (var p in paramBnd.Files)
+                    using var drawParamBnd = BND3.Read(bnd);
+                    foreach (var p in drawParamBnd.Files)
                     {
                         if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
                         {
                             p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
                         }
                     }
-                    Utils.WriteWithBackup(dir, mod, @$"param\DrawParam\{Path.GetFileName(bnd)}", paramBnd);
+                    Utils.WriteWithBackup(dir, mod, @$"param\DrawParam\{Path.GetFileName(bnd)}", drawParamBnd);
                 }
             }
         }
@@ -1288,6 +1293,7 @@ namespace StudioCore.ParamEditor
                                                           "\n\nWould you like to reinsert params into the bnd that were previously stripped out?", "DS2 de-loose param",
                         MessageBoxButtons.YesNo) == DialogResult.Yes)
                     {
+                        paramBnd.Dispose();
                         param = $@"{dir}\enc_regulation.bnd.dcx";
                         if (!BND4.Is($@"{dir}\enc_regulation.bnd.dcx"))
                         {
@@ -1342,6 +1348,7 @@ namespace StudioCore.ParamEditor
 
             }
             Utils.WriteWithBackup(dir, mod, @"enc_regulation.bnd.dcx", paramBnd);
+            paramBnd.Dispose();
         }
 
         private void SaveParamsDS3(bool loose)
@@ -1460,7 +1467,7 @@ namespace StudioCore.ParamEditor
                 PlatformUtils.Instance.MessageBox("Could not find param file. Cannot save.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            BND3 paramBnd = BND3.Read(param);
+            using var paramBnd = BND3.Read(param);
 
             // Replace params with edited ones
             foreach (var p in paramBnd.Files)
@@ -1505,15 +1512,15 @@ namespace StudioCore.ParamEditor
                 }
                 foreach (var bnd in drawParambndPaths)
                 {
-                    paramBnd = BND3.Read(bnd);
-                    foreach (var p in paramBnd.Files)
+                    using var drawParamBnd = BND3.Read(bnd);
+                    foreach (var p in drawParamBnd.Files)
                     {
                         if (_params.ContainsKey(Path.GetFileNameWithoutExtension(p.Name)))
                         {
                             p.Bytes = _params[Path.GetFileNameWithoutExtension(p.Name)].Write();
                         }
                     }
-                    Utils.WriteWithBackup(dir, mod, @$"param\drawparam\{Path.GetFileName(bnd)}", paramBnd);
+                    Utils.WriteWithBackup(dir, mod, @$"param\drawparam\{Path.GetFileName(bnd)}", drawParamBnd);
                 }
             }
         }
@@ -1967,20 +1974,20 @@ namespace StudioCore.ParamEditor
             {
                 // Note these all use modified as any unmodified row already matches the target. This only fails if a mod pre-empts fromsoft's exact change.
                 paramUpgradeTasks = new (ulong, string, string)[]{
-                    (10701000l, "1.07 - (SwordArtsParam) Move swordArtsType to swordArtsTypeNew", "param SwordArtsParam: modified: swordArtsTypeNew: = field swordArtsType;"),
-                    (10701000l, "1.07 - (SwordArtsParam) Set swordArtsType to 0", "param SwordArtsParam: modified && !added: swordArtsType: = 0;"),
-                    (10701000l, "1.07 - (AtkParam PC/NPC) Set added finalAttackDamageRate refs to -1", "param AtkParam_(Pc|Npc): modified && added: finalDamageRateId: = -1;"),
-                    (10701000l, "1.07 - (AtkParam PC/NPC) Set not-added finalAttackDamageRate refs to vanilla", "param AtkParam_(Pc|Npc): modified && !added: finalDamageRateId: = vanillafield finalDamageRateId;"),
-                    (10701000l, "1.07 - (AssetEnvironmentGeometryParam) Set reserved_124 to Vanilla v1.07 values", "param GameSystemCommonParam: modified && !added: reserved_124: = vanillafield reserved_124;"),
-                    (10701000l, "1.07 - (AssetEnvironmentGeometryParam) Set reserved41 to Vanilla v1.07 values", "param PlayerCommonParam: modified: reserved41: = vanillafield reserved41;"),
-                    (10701000l, "1.07 - (AssetEnvironmentGeometryParam) Set Reserve_1 to Vanilla v1.07 values", "param AssetEnvironmentGeometryParam: modified: Reserve_1: = vanillafield Reserve_1;"),
-                    (10701000l, "1.07 - (AssetEnvironmentGeometryParam) Set Reserve_2 to Vanilla v1.07 values", "param AssetEnvironmentGeometryParam: modified: Reserve_2: = vanillafield Reserve_2;"),
-                    (10701000l, "1.07 - (AssetEnvironmentGeometryParam) Set Reserve_3 to Vanilla v1.07 values", "param AssetEnvironmentGeometryParam: modified: Reserve_3: = vanillafield Reserve_3;"),
-                    (10701000l, "1.07 - (AssetEnvironmentGeometryParam) Set Reserve_4 to Vanilla v1.07 values", "param AssetEnvironmentGeometryParam: modified: Reserve_4: = vanillafield Reserve_4;"),
-                    (10801000l, "1.08 - (BuddyParam) Set Unk1 to default value", "param BuddyParam: modified: Unk1: = 1410;"),
-                    (10801000l, "1.08 - (BuddyParam) Set Unk2 to default value", "param BuddyParam: modified: Unk2: = 1420;"),
-                    (10801000l, "1.08 - (BuddyParam) Set Unk11 to default value", "param BuddyParam: modified: Unk11: = 1400;"),
-                    (10900000l, "1.09 - (GameSystemCommonParam) Set reserved_124 to Vanilla v1.09 values", "param GameSystemCommonParam: id 0: reserved_124: = vanillafield reserved_124;")
+                    (10701000L, "1.07 - (SwordArtsParam) Move swordArtsType to swordArtsTypeNew", "param SwordArtsParam: modified: swordArtsTypeNew: = field swordArtsType;"),
+                    (10701000L, "1.07 - (SwordArtsParam) Set swordArtsType to 0", "param SwordArtsParam: modified && !added: swordArtsType: = 0;"),
+                    (10701000L, "1.07 - (AtkParam PC/NPC) Set added finalAttackDamageRate refs to -1", "param AtkParam_(Pc|Npc): modified && added: finalDamageRateId: = -1;"),
+                    (10701000L, "1.07 - (AtkParam PC/NPC) Set not-added finalAttackDamageRate refs to vanilla", "param AtkParam_(Pc|Npc): modified && !added: finalDamageRateId: = vanillafield finalDamageRateId;"),
+                    (10701000L, "1.07 - (AssetEnvironmentGeometryParam) Set reserved_124 to Vanilla v1.07 values", "param GameSystemCommonParam: modified && !added: reserved_124: = vanillafield reserved_124;"),
+                    (10701000L, "1.07 - (AssetEnvironmentGeometryParam) Set reserved41 to Vanilla v1.07 values", "param PlayerCommonParam: modified: reserved41: = vanillafield reserved41;"),
+                    (10701000L, "1.07 - (AssetEnvironmentGeometryParam) Set Reserve_1 to Vanilla v1.07 values", "param AssetEnvironmentGeometryParam: modified: Reserve_1: = vanillafield Reserve_1;"),
+                    (10701000L, "1.07 - (AssetEnvironmentGeometryParam) Set Reserve_2 to Vanilla v1.07 values", "param AssetEnvironmentGeometryParam: modified: Reserve_2: = vanillafield Reserve_2;"),
+                    (10701000L, "1.07 - (AssetEnvironmentGeometryParam) Set Reserve_3 to Vanilla v1.07 values", "param AssetEnvironmentGeometryParam: modified: Reserve_3: = vanillafield Reserve_3;"),
+                    (10701000L, "1.07 - (AssetEnvironmentGeometryParam) Set Reserve_4 to Vanilla v1.07 values", "param AssetEnvironmentGeometryParam: modified: Reserve_4: = vanillafield Reserve_4;"),
+                    (10801000L, "1.08 - (BuddyParam) Set Unk1 to default value", "param BuddyParam: modified: Unk1: = 1410;"),
+                    (10801000L, "1.08 - (BuddyParam) Set Unk2 to default value", "param BuddyParam: modified: Unk2: = 1420;"),
+                    (10801000L, "1.08 - (BuddyParam) Set Unk11 to default value", "param BuddyParam: modified: Unk11: = 1400;"),
+                    (10900000L, "1.09 - (GameSystemCommonParam) Set reserved_124 to Vanilla v1.09 values", "param GameSystemCommonParam: id 0: reserved_124: = vanillafield reserved_124;")
                 };
             }
 
