@@ -54,6 +54,7 @@ namespace StudioCore.TextEditor
             _activeIDCache = -1;
             _searchFilter = "";
             _searchFilterCached = "";
+            _itemHeightCache = null;
         }
 
         private void ResetActionManager()
@@ -73,6 +74,7 @@ namespace StudioCore.TextEditor
             // Lazy method to refresh search filter
             // TODO: _searchFilterCached should be cleared whenever CacheBank is cleared.
             _searchFilterCached = "";
+            _itemHeightCache = null;
         }
 
         /// <summary>
@@ -87,6 +89,7 @@ namespace StudioCore.TextEditor
 
             // Lazy method to refresh search filter
             _searchFilterCached = "";
+            _itemHeightCache = null;
         }
 
         public void DrawEditorMenu()
@@ -223,11 +226,13 @@ namespace StudioCore.TextEditor
                    
                     _EntryLabelCacheFiltered = matches;
                     _searchFilterCached = _searchFilter;
+                    _itemHeightCache = null;
                     doFocus = true;
                 }
                 else if (_entryLabelCache != _EntryLabelCacheFiltered && _searchFilter == "")
                 {
                     _EntryLabelCacheFiltered = _entryLabelCache;
+                    _itemHeightCache = null;
                 }
             }
         }
@@ -258,6 +263,7 @@ namespace StudioCore.TextEditor
                     {
                         ClearTextEditorCache();
                         _activeFmgInfo = info;
+                        _itemHeightCache = null;
                     }
 
                     if (doFocus && info == _activeFmgInfo)
@@ -266,6 +272,29 @@ namespace StudioCore.TextEditor
                     }
                 }
             }
+        }
+        
+        private List<float> _itemHeightCache = null;
+        private int _itemHeightTotal = 0;
+        private float _lastColumnWidth = -1;
+        public int GetListClipperRange(float pos_target, ref int item_current, ref float item_current_y1)
+        {
+            if (item_current_y1 != pos_target)
+            {
+                while (item_current_y1 <= pos_target && item_current < _itemHeightCache.Count)
+                {
+                    item_current_y1 += _itemHeightCache[item_current];
+                    item_current++;
+                }
+            }
+            return item_current;
+        }
+        private string GetEntryLabel(FMG.Entry r)
+        {
+            var text = (r.Text == null) ? "%null%" : r.Text.Replace("\n", "\n".PadRight(r.ID.ToString().Length + 2));
+            var label = $@"{r.ID} {text}";
+            label = Utils.ImGui_WordWrapString(label, ImGui.GetColumnWidth());
+            return label;
         }
 
         private void EditorGUI(bool doFocus)
@@ -356,10 +385,59 @@ namespace StudioCore.TextEditor
             }
             else
             {
+                // Generate item heights for ListClipper
+                if (_itemHeightCache == null || ImGui.GetColumnWidth() != _lastColumnWidth)
+                {
+                    _itemHeightCache = new();
+                    float totalHeight = 0.0f;
+                    foreach (var r in _EntryLabelCacheFiltered)
+                    {
+                        //EntrySelectableUI(entry);
+                        var label = GetEntryLabel(r);
+                        var size = ImGui.CalcTextSize(label).Y + ImGui.GetStyle().ItemSpacing.Y;
+                        totalHeight += size;
+                        _itemHeightCache.Add(size);
+                    }
+                    _itemHeightTotal = (int)Math.Ceiling(totalHeight);
+                    _lastColumnWidth = ImGui.GetColumnWidth();
+                }
+
+                if (_activeEntryGroup == null)
+                {
+                    foreach (var r in _EntryLabelCacheFiltered)
+                    {
+                        if (_activeIDCache == r.ID)
+                        {
+                            _activeEntryGroup = FMGBank.GenerateEntryGroup(r.ID, _activeFmgInfo);
+                            _searchFilterCached = "";
+                            break;
+                        }
+                    }
+                }
+
+                if (doFocus && _activeEntryGroup != null)
+                {
+                    // Scroll to an item. Generate entire list to get accurate height position.
+                    foreach (var r in _EntryLabelCacheFiltered)
+                    {
+                        var label = GetEntryLabel(r);
+                        if (ImGui.Selectable(label, _activeIDCache == r.ID))
+                        {
+                            _activeEntryGroup = FMGBank.GenerateEntryGroup(r.ID, _activeFmgInfo);
+                        }
+                        if (_activeEntryGroup.ID == r.ID)
+                        {
+                            ImGui.SetScrollHereY();
+                            break;
+                        }
+                    }
+                }
                 unsafe
                 {
+                    int item_current = 0;
+                    float item_current_y1 = 0.0f;
                     ImGuiListClipperPtr clipper = new(ImGuiNative.ImGuiListClipper_ImGuiListClipper());
-                    clipper.Begin(_EntryLabelCacheFiltered.Count);
+                    clipper.Begin(_itemHeightTotal, 1.0f);
                     // Up/Down arrow key input
                     if (InputTracker.GetKey(Key.Up) || InputTracker.GetKey(Key.Down))
                     {
@@ -367,21 +445,22 @@ namespace StudioCore.TextEditor
                     }
                     while (clipper.Step())
                     {
-                        for (var i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
+                        float pos_min_y = (float)clipper.DisplayStart;
+                        float pos_max_y = (float)clipper.DisplayEnd;
+
+                        // Advance min/max item height to determine which items should appear
+                        int item_min = GetListClipperRange(pos_min_y, ref item_current, ref item_current_y1);
+                        int item_max = GetListClipperRange(pos_max_y, ref item_current, ref item_current_y1);
+                        if (item_max < _EntryLabelCacheFiltered.Count)
+                            item_max++; // Buffer
+                        for (int i = item_min; i < item_max; i++)
                         {
-                            FMG.Entry r = _EntryLabelCacheFiltered[i];
                             // Entries
-                            var text = (r.Text == null) ? "%null%" : r.Text.Replace("\n", "\n".PadRight(r.ID.ToString().Length + 2));
-                            var label = $@"{r.ID} {text}";
-                            label = Utils.ImGui_WordWrapString(label, ImGui.GetColumnWidth());
+                            FMG.Entry r = _EntryLabelCacheFiltered[i];
+                            var label = GetEntryLabel(r);
                             if (ImGui.Selectable(label, _activeIDCache == r.ID))
                             {
                                 _activeEntryGroup = FMGBank.GenerateEntryGroup(r.ID, _activeFmgInfo);
-                            }
-                            else if (_activeIDCache == r.ID && _activeEntryGroup == null)
-                            {
-                                _activeEntryGroup = FMGBank.GenerateEntryGroup(r.ID, _activeFmgInfo);
-                                _searchFilterCached = "";
                             }
 
                             if (_arrowKeyPressed && ImGui.IsItemFocused()
@@ -405,20 +484,6 @@ namespace StudioCore.TextEditor
                                     DeleteFMGEntries(_activeEntryGroup);
                                 }
                                 ImGui.EndPopup();
-                            }
-                        }
-                    }
-                    if (doFocus && _activeEntryGroup != null)
-                    {
-                        for (var i = 0; i < _EntryLabelCacheFiltered.Count; i++)
-                        {
-                            if (_activeEntryGroup.ID == _EntryLabelCacheFiltered[i].ID)
-                            {
-                                // Scroll to currently selected entrygroup
-                                var itemY = clipper.StartPosY + clipper.ItemsHeight * i;
-                                var x = itemY - ImGui.GetWindowPos().Y;
-                                ImGui.SetScrollFromPosY(itemY - ImGui.GetWindowPos().Y);
-                                break;
                             }
                         }
                     }
