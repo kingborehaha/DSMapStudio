@@ -263,7 +263,7 @@ namespace StudioCore
                 {
                     item.Write(writepath + ".temp");
                 }
-                
+
                 // Ugly but until I rethink the binder API we need to dispose it before touching the existing files
                 if (item is IDisposable d)
                 {
@@ -766,7 +766,7 @@ namespace StudioCore
 
         public static void ImGuiGenericHelpPopup(string buttonText, string imguiID, string displayText)
         {
-            if (ImGui.Button(buttonText+"##"+imguiID))
+            if (ImGui.Button(buttonText + "##" + imguiID))
                 ImGui.OpenPopup(imguiID);
             if (ImGui.BeginPopup(imguiID))
             {
@@ -834,5 +834,22 @@ namespace StudioCore
             }
             return text;
         }
+
+        /// <summary>
+        /// Used for Imgui ListClippers with variable heights
+        /// </summary>
+        public static int GetListClipperRange(List<float> itemHeightCache, float pos_target, ref int item_current, ref float item_current_y)
+        {
+            if (item_current_y != pos_target)
+            {
+                while (item_current_y <= pos_target && item_current < itemHeightCache.Count)
+                {
+                    item_current_y += itemHeightCache[item_current];
+                    item_current++;
+                }
+            }
+            return item_current;
+        }
+
     }
 }
