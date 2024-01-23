@@ -323,10 +323,10 @@ public class SceneTree : IActionEventHandler
             ImGui.EndPopup();
         }
 
+        
         if (ImGui.BeginDragDropSource())
         {
-            ImGui.Text(e.PrettyName);
-            // Kinda meme
+            //ImGui.Text(e.PrettyName);
             DragDropPayload p = new();
             p.Entity = e;
             _dragDropPayloads.Add(_dragDropPayloadCounter, p);
@@ -340,7 +340,7 @@ public class SceneTree : IActionEventHandler
             _initiatedDragDrop = true;
         }
 
-        if (hierarchial && ImGui.BeginDragDropTarget())
+        if (ImGui.BeginDragDropTarget())
         {
             ImGuiPayloadPtr payload = ImGui.AcceptDragDropPayload("entity");
             if (payload.NativePtr != null)
@@ -348,13 +348,21 @@ public class SceneTree : IActionEventHandler
                 var h = (DragDropPayloadReference*)payload.Data;
                 DragDropPayload pload = _dragDropPayloads[h->Index];
                 _dragDropPayloads.Remove(h->Index);
-                _dragDropSources.Add(pload.Entity);
-                _dragDropDestObjects.Add(e);
-                _dragDropDests.Add(e.Children.Count);
+                if (hierarchial)
+                {
+                    _dragDropSources.Add(pload.Entity);
+                    _dragDropDestObjects.Add(e.Parent);
+                    _dragDropDests.Add(e.Parent.ChildIndex(e) + 1);
+                }
+                else
+                {
+                    _dragDropSources.Add(pload.Entity);
+                    _dragDropDests.Add(pload.Entity.Container.Objects.IndexOf(e) + 1); // Error can be observed here: target ent is fucking wrong the further down the list it is!
+                }
             }
 
             ImGui.EndDragDropTarget();
-        }
+        }/*
 
         // Visibility icon
         if (visicon)
@@ -374,53 +382,9 @@ public class SceneTree : IActionEventHandler
                 doSelect = false;
             }
         }
-
+        */
         // If the visibility icon wasn't clicked, perform the selection
         Utils.EntitySelectionHandler(_selection, e, doSelect, arrowKeySelect);
-        
-        // Invisible item to be a drag drop target between nodes
-        if (_pendingDragDrop)
-        {
-            if (e is MapEntity me2)
-            {
-                ImGui.SetItemAllowOverlap();
-                ImGui.InvisibleButton(me2.Type + e.Name, new Vector2(-1, 3.0f) * scale);
-            }
-            else
-            {
-                ImGui.SetItemAllowOverlap();
-                ImGui.InvisibleButton(e.Name, new Vector2(-1, 3.0f) * scale);
-            }
-
-            if (ImGui.IsItemFocused())
-            {
-                _setNextFocus = true;
-            }
-
-            if (ImGui.BeginDragDropTarget())
-            {
-                ImGuiPayloadPtr payload = ImGui.AcceptDragDropPayload("entity");
-                if (payload.NativePtr != null) //todo: never passes
-                {
-                    var h = (DragDropPayloadReference*)payload.Data;
-                    DragDropPayload pload = _dragDropPayloads[h->Index];
-                    _dragDropPayloads.Remove(h->Index);
-                    if (hierarchial)
-                    {
-                        _dragDropSources.Add(pload.Entity);
-                        _dragDropDestObjects.Add(e.Parent);
-                        _dragDropDests.Add(e.Parent.ChildIndex(e) + 1);
-                    }
-                    else
-                    {
-                        _dragDropSources.Add(pload.Entity);
-                        _dragDropDests.Add(pload.Entity.Container.Objects.IndexOf(e) + 1);
-                    }
-                }
-
-                ImGui.EndDragDropTarget();
-            }
-        }
 
         // If there's children then draw them
         if (nodeopen)

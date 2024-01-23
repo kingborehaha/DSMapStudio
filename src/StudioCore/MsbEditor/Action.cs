@@ -925,7 +925,7 @@ public class ReorderContainerObjectsAction : Action
             }
         }
 
-        return ActionEvent.NoEvent;
+        return ActionEvent.ObjectAddedRemoved;
     }
 
     public override ActionEvent Undo()
