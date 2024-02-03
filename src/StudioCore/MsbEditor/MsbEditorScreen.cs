@@ -1,4 +1,4 @@
-﻿using static Andre.Native.ImGuiBindings;
+﻿using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using SoulsFormats;
 using StudioCore.Editor;
@@ -290,20 +290,9 @@ public class MsbEditorScreen : EditorScreen, SceneTreeEventHandler
                 {
                     _createEntityMapIndex = 0;
                 }
-                
-                if (ImGui.BeginCombo("Target Map", loadedMaps.ElementAt(_createEntityMapIndex).Name))
-                {
-                    int i = 0;
-                    foreach (var m in loadedMaps)
-                    {
-                        if (ImGui.Selectable(m.Name))
-                        {
-                            _createEntityMapIndex = i;
-                        }
-                        i++;
-                    }
-                    ImGui.EndCombo();
-                }
+
+                ImGui.Combo("Target Map", ref _createEntityMapIndex, loadedMaps.Select(e => e.Name).ToArray(),
+                    loadedMaps.Count());
 
                 var map = (Map)loadedMaps.ElementAt(_createEntityMapIndex);
 
@@ -634,7 +623,7 @@ public class MsbEditorScreen : EditorScreen, SceneTreeEventHandler
         }
     }
 
-    public unsafe void OnGUI(string[] initcmd)
+    public void OnGUI(string[] initcmd)
     {
         var scale = MapStudioNew.GetUIScale();
 
@@ -646,10 +635,10 @@ public class MsbEditorScreen : EditorScreen, SceneTreeEventHandler
         wins.Y -= 20.0f * scale;
         ImGui.SetNextWindowPos(winp);
         ImGui.SetNextWindowSize(wins);
-        ImGui.PushStyleVarFloat(ImGuiStyleVar.WindowRounding, 0.0f);
-        ImGui.PushStyleVarFloat(ImGuiStyleVar.WindowBorderSize, 0.0f);
-        ImGui.PushStyleVarVec2(ImGuiStyleVar.WindowPadding, new Vector2(0.0f, 0.0f));
-        ImGui.PushStyleVarFloat(ImGuiStyleVar.ChildBorderSize, 0.0f);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 0.0f);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0.0f);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(0.0f, 0.0f));
+        ImGui.PushStyleVar(ImGuiStyleVar.ChildBorderSize, 0.0f);
         ImGuiWindowFlags flags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse |
                                  ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove;
         flags |= ImGuiWindowFlags.MenuBar | ImGuiWindowFlags.NoDocking;
@@ -658,7 +647,7 @@ public class MsbEditorScreen : EditorScreen, SceneTreeEventHandler
         //ImGui.Begin("DockSpace_MapEdit", flags);
         ImGui.PopStyleVar(4);
         var dsid = ImGui.GetID("DockSpace_MapEdit");
-        ImGui.DockSpace(dsid, new Vector2(0, 0), 0, null);
+        ImGui.DockSpace(dsid, new Vector2(0, 0));
 
         // Keyboard shortcuts
         if (!ViewportUsingKeyboard && !ImGui.IsAnyItemActive())
@@ -905,7 +894,7 @@ public class MsbEditorScreen : EditorScreen, SceneTreeEventHandler
         }
 
         ImGui.SetNextWindowSize(new Vector2(300, 500) * scale, ImGuiCond.FirstUseEver);
-        ImGui.SetNextWindowPos(new Vector2(20, 20) * scale, ImGuiCond.FirstUseEver, default);
+        ImGui.SetNextWindowPos(new Vector2(20, 20) * scale, ImGuiCond.FirstUseEver);
 
         Vector3 clear_color = new(114f / 255f, 144f / 255f, 154f / 255f);
         //ImGui.Text($@"Viewport size: {Viewport.Width}x{Viewport.Height}");

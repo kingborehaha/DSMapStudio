@@ -1,4 +1,4 @@
-﻿using static Andre.Native.ImGuiBindings;
+﻿using ImGuiNET;
 using SoulsFormats;
 using StudioCore.Editor;
 using System;
@@ -10,7 +10,7 @@ using Veldrid.Sdl2;
 
 namespace StudioCore.TextEditor;
 
-public unsafe class TextEditorScreen : EditorScreen
+public class TextEditorScreen : EditorScreen
 {
     private readonly PropertyEditor _propEditor;
 
@@ -126,7 +126,7 @@ public unsafe class TextEditorScreen : EditorScreen
         var scale = MapStudioNew.GetUIScale();
 
         // Docking setup
-        ImGui.PushStyleVarVec2(ImGuiStyleVar.WindowPadding, new Vector2(4, 4) * scale);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(4, 4) * scale);
         Vector2 wins = ImGui.GetWindowSize();
         Vector2 winp = ImGui.GetWindowPos();
         winp.Y += 20.0f * scale;
@@ -240,7 +240,7 @@ public unsafe class TextEditorScreen : EditorScreen
         }
 
         EditorGUI(doFocus);
-        ImGui.PopStyleVar(1);
+        ImGui.PopStyleVar();
     }
 
     public void OnProjectChanged(ProjectSettings newSettings)
@@ -487,7 +487,7 @@ public unsafe class TextEditorScreen : EditorScreen
         }
 
         var dsid = ImGui.GetID("DockSpace_TextEntries");
-        ImGui.DockSpace(dsid, new Vector2(0, 0), ImGuiDockNodeFlags.None, null);
+        ImGui.DockSpace(dsid, new Vector2(0, 0), ImGuiDockNodeFlags.None);
 
         ImGui.Begin("Text Categories");
         ImGui.Indent();
@@ -628,7 +628,7 @@ public unsafe class TextEditorScreen : EditorScreen
                     ? "%null%"
                     : r.Text.Replace("\n", "\n".PadRight(r.ID.ToString().Length + 2));
                 var label = $@"{r.ID} {text}";
-                label = Utils.ImGui_WordWrapString(label, ImGui.GetColumnWidth(-1));
+                label = Utils.ImGui_WordWrapString(label, ImGui.GetColumnWidth());
                 if (ImGui.Selectable(label, _activeIDCache == r.ID))
                 {
                     _activeEntryGroup = FMGBank.GenerateEntryGroup(r.ID, _activeFmgInfo);

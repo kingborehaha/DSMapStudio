@@ -1,5 +1,5 @@
 ﻿using Andre.Formats;
-using static Andre.Native.ImGuiBindings;
+using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using SoulsFormats;
 using StudioCore.ParamEditor;
@@ -15,7 +15,7 @@ using Veldrid;
 
 namespace StudioCore.Editor;
 
-public unsafe class EditorDecorations
+public class EditorDecorations
 {
     private static string _refContextCurrentAutoComplete = "";
 
@@ -36,8 +36,8 @@ public unsafe class EditorDecorations
             return;
         }
 
-        ImGui.PushStyleVarVec2(ImGuiStyleVar.ItemSpacing, new Vector2(0, ImGui.GetStyle()->ItemSpacing.Y));
-        ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, ImGui.GetStyle().ItemSpacing.Y));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 1.0f, 0.0f, 1.0f));
         ImGui.TextUnformatted(@"   <");
         List<string> inactiveRefs = new();
         var first = true;
@@ -65,7 +65,7 @@ public unsafe class EditorDecorations
             }
         }
 
-        ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.7f, 0.7f, 0.7f, 1.0f));
         foreach (var inactive in inactiveRefs)
         {
             ImGui.SameLine();
@@ -81,12 +81,12 @@ public unsafe class EditorDecorations
             first = false;
         }
 
-        ImGui.PopStyleColor(1);
+        ImGui.PopStyleColor();
 
         ImGui.SameLine();
         ImGui.TextUnformatted(">");
-        ImGui.PopStyleColor(1);
-        ImGui.PopStyleVar(1);
+        ImGui.PopStyleColor();
+        ImGui.PopStyleVar();
     }
 
     public static void FmgRefText(List<FMGRef> fmgRef, Param.Row context)
@@ -98,8 +98,8 @@ public unsafe class EditorDecorations
 
         if (CFG.Current.Param_HideReferenceRows == false) //Move preference
         {
-            ImGui.PushStyleVarVec2(ImGuiStyleVar.ItemSpacing, new Vector2(0, 0));
-            ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 0));
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 1.0f, 0.0f, 1.0f));
             ImGui.TextUnformatted(@"   [");
             List<string> inactiveRefs = new();
             var first = true;
@@ -128,7 +128,7 @@ public unsafe class EditorDecorations
                 }
             }
 
-            ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.7f, 0.7f, 0.7f, 1.0f));
             foreach (var inactive in inactiveRefs)
             {
                 ImGui.SameLine();
@@ -144,12 +144,12 @@ public unsafe class EditorDecorations
                 first = false;
             }
 
-            ImGui.PopStyleColor(1);
+            ImGui.PopStyleColor();
 
             ImGui.SameLine();
             ImGui.TextUnformatted("]");
-            ImGui.PopStyleColor(1);
-            ImGui.PopStyleVar(1);
+            ImGui.PopStyleColor();
+            ImGui.PopStyleVar();
         }
     }
 
@@ -166,19 +166,19 @@ public unsafe class EditorDecorations
         // May span lines
         List<(string, Param.Row, string)> matches = resolveRefs(bank, paramRefs, context, oldval);
         var entryFound = matches.Count > 0;
-        ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f));
         ImGui.BeginGroup();
         foreach ((var param, Param.Row row, var adjName) in matches)
         {
             ImGui.TextUnformatted(adjName);
         }
 
-        ImGui.PopStyleColor(1);
+        ImGui.PopStyleColor();
         if (!entryFound)
         {
-            ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(0.0f, 0.0f, 0.0f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.0f, 0.0f, 0.0f, 1.0f));
             ImGui.TextUnformatted("___");
-            ImGui.PopStyleColor(1);
+            ImGui.PopStyleColor();
         }
 
         ImGui.EndGroup();
@@ -316,7 +316,7 @@ public unsafe class EditorDecorations
                     return toPrint.TrimStart();
                 }).ToList();
         });
-        ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f));
         foreach (var text in textsToPrint)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -329,24 +329,24 @@ public unsafe class EditorDecorations
             }
         }
 
-        ImGui.PopStyleColor(1);
+        ImGui.PopStyleColor();
     }
 
     public static void EnumNameText(ParamEnum pEnum)
     {
         if (pEnum != null && pEnum.name != null && CFG.Current.Param_HideEnums == false) //Move preference
         {
-            ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 1.0f, 0.0f, 1.0f));
             ImGui.TextUnformatted($@"   {pEnum.name}");
-            ImGui.PopStyleColor(1);
+            ImGui.PopStyleColor();
         }
     }
 
     public static void EnumValueText(Dictionary<string, string> enumValues, string value)
     {
-        ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f));
         ImGui.TextUnformatted(enumValues.GetValueOrDefault(value, "Not Enumerated"));
-        ImGui.PopStyleColor(1);
+        ImGui.PopStyleColor();
     }
 
     public static void VirtualParamRefSelectables(ParamBank bank, string virtualRefName, object searchValue,
@@ -728,14 +728,14 @@ public unsafe class EditorDecorations
             {
                 (values, maxY) = UICache.GetCached(screen, row, "soulCostData",
                     () => ParamUtils.getSoulCostData(scd, row));
-                ImGui.PlotLines("##graph", values, 0, "", 0, maxY,
+                ImGui.PlotLines("##graph", ref values[0], values.Length, 0, "", 0, maxY,
                     new Vector2(ImGui.GetColumnWidth(-1) - 30.0f, (ImGui.GetColumnWidth(-1) * 0.5625f) - 30.0f));
             }
             else if (ccd != null)
             {
                 (values, xOffset, minY, maxY) = UICache.GetCached(screen, row, "calcCorrectData",
                     () => ParamUtils.getCalcCorrectedData(ccd, row));
-                ImGui.PlotLines("##graph", values, 0,
+                ImGui.PlotLines("##graph", ref values[0], values.Length, 0,
                     xOffset == 0 ? "" : $@"Note: add {xOffset} to x coordinate", minY, maxY,
                     new Vector2(ImGui.GetColumnWidth(-1) - 30f, (ImGui.GetColumnWidth(-1) * 0.5625f) - 30f));
             }
@@ -798,7 +798,7 @@ public unsafe class EditorDecorations
     {
         var lastCol = false;
         var cols = ImGui.TableGetColumnCount();
-        ImGui.TableNextRow(0, 0);
+        ImGui.TableNextRow();
         for (var i = 0; i < cols; i++)
         {
             if (ImGui.TableNextColumn())
@@ -813,10 +813,10 @@ public unsafe class EditorDecorations
 
     public static bool ImGuiTableStdColumns(string id, int cols, bool fixVerticalPadding)
     {
-        Vector2 oldPad = ImGui.GetStyle()->CellPadding;
+        Vector2 oldPad = ImGui.GetStyle().CellPadding;
         if (fixVerticalPadding)
         {
-            ImGui.GetStyle()->CellPadding = new Vector2(oldPad.X, 0);
+            ImGui.GetStyle().CellPadding = new Vector2(oldPad.X, 0);
         }
 
         var v = ImGui.BeginTable(id, cols,
@@ -824,7 +824,7 @@ public unsafe class EditorDecorations
             ImGuiTableFlags.ScrollY);
         if (fixVerticalPadding)
         {
-            ImGui.GetStyle()->CellPadding = oldPad;
+            ImGui.GetStyle().CellPadding = oldPad;
         }
 
         return v;

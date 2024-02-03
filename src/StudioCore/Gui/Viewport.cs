@@ -1,4 +1,4 @@
-﻿using static Andre.Native.ImGuiBindings;
+﻿using ImGuiNET;
 using StudioCore.DebugPrimitives;
 using StudioCore.MsbEditor;
 using StudioCore.Resource;
@@ -18,7 +18,7 @@ namespace StudioCore.Gui;
 ///     transform
 ///     the view within a virtual canvas, or it can be manually configured for say rendering thumbnails
 /// </summary>
-public unsafe class Viewport : IViewport
+public class Viewport : IViewport
 {
     private readonly ActionManager _actionManager;
 
@@ -140,7 +140,7 @@ public unsafe class Viewport : IViewport
             ResizeViewport(_device, newvp);
             if (InputTracker.GetMouseButtonDown(MouseButton.Right) && MouseInViewport())
             {
-                ImGui.SetWindowFocusNil();
+                ImGui.SetWindowFocus();
                 ViewportSelected = true;
             }
             else if (!InputTracker.GetMouseButton(MouseButton.Right))
@@ -148,7 +148,7 @@ public unsafe class Viewport : IViewport
                 ViewportSelected = false;
             }
 
-            _canInteract = ImGui.IsWindowFocused(0);
+            _canInteract = ImGui.IsWindowFocused();
             _vpvisible = true;
             Matrix4x4 proj = Matrix4x4.Transpose(_projectionMat);
             Matrix4x4 view = Matrix4x4.Transpose(WorldView.CameraTransform.CameraViewMatrixLH);

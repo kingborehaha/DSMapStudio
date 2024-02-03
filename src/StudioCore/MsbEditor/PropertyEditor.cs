@@ -1,5 +1,5 @@
 ﻿using Andre.Formats;
-using static Andre.Native.ImGuiBindings;
+using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using SoulsFormats;
 using StudioCore.Editor;
@@ -500,12 +500,12 @@ public class PropertyEditor
         var id = 0;
 
         // This should be rewritten somehow it's super ugly
-        ImGui.PushStyleColorVec4(ImGuiCol.Text, new Vector4(0.8f, 0.8f, 0.8f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.8f, 0.8f, 0.8f, 1.0f));
         PropertyInfo nameProp = row.GetType().GetProperty("Name");
         PropertyInfo idProp = row.GetType().GetProperty("ID");
         PropEditorPropInfoRow(row, nameProp, "Name", ref id, null);
         PropEditorPropInfoRow(row, idProp, "ID", ref id, null);
-        ImGui.PopStyleColor(1);
+        ImGui.PopStyleColor();
 
         foreach (Param.Column cell in row.Columns)
         {
@@ -555,7 +555,7 @@ public class PropertyEditor
     /// </summary>
     private static void PropContextRowOpener()
     {
-        ImGui.Selectable("", false, ImGuiSelectableFlags.AllowOverlap);
+        ImGui.Selectable("", false, ImGuiSelectableFlags.AllowItemOverlap);
         ImGui.SameLine();
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
         {
@@ -720,7 +720,7 @@ public class PropertyEditor
                             var changed = propEditResults.Item1;
                             var committed = propEditResults.Item2;
                             DisplayPropContextMenu(prop, obj);
-                            if (ImGui.IsItemActive() && !ImGui.IsWindowFocused(0))
+                            if (ImGui.IsItemActive() && !ImGui.IsWindowFocused())
                             {
                                 ImGui.SetItemDefaultFocus();
                             }
@@ -780,7 +780,7 @@ public class PropertyEditor
                             var changed = propEditResults.Item1;
                             var committed = propEditResults.Item2;
                             DisplayPropContextMenu(prop, obj);
-                            if (ImGui.IsItemActive() && !ImGui.IsWindowFocused(0))
+                            if (ImGui.IsItemActive() && !ImGui.IsWindowFocused())
                             {
                                 ImGui.SetItemDefaultFocus();
                             }
@@ -952,7 +952,7 @@ public class PropertyEditor
                     var changed = propEditResults.Item1;
                     var committed = propEditResults.Item2;
                     DisplayPropContextMenu(prop, obj);
-                    if (ImGui.IsItemActive() && !ImGui.IsWindowFocused(0))
+                    if (ImGui.IsItemActive() && !ImGui.IsWindowFocused())
                     {
                         ImGui.SetItemDefaultFocus();
                     }
@@ -1066,14 +1066,14 @@ public class PropertyEditor
         }
     }
 
-    public unsafe void OnGui(Selection selection, string id, float w, float h)
+    public void OnGui(Selection selection, string id, float w, float h)
     {
         var scale = MapStudioNew.GetUIScale();
         HashSet<Entity> entSelection = selection.GetFilteredSelection<Entity>();
 
-        ImGui.PushStyleColorVec4(ImGuiCol.ChildBg, new Vector4(0.145f, 0.145f, 0.149f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, new Vector4(0.145f, 0.145f, 0.149f, 1.0f));
         ImGui.SetNextWindowSize(new Vector2(350, h - 80) * scale, ImGuiCond.FirstUseEver);
-        ImGui.SetNextWindowPos(new Vector2(w - 370, 20) * scale, ImGuiCond.FirstUseEver, default);
+        ImGui.SetNextWindowPos(new Vector2(w - 370, 20) * scale, ImGuiCond.FirstUseEver);
         ImGui.Begin($@"Properties##{id}");
         ImGui.BeginChild("propedit");
         if (entSelection.Count > 1)
@@ -1086,17 +1086,17 @@ public class PropertyEditor
                     ImGui.Text("Cannot edit multiples of this object at once.");
                     ImGui.EndChild();
                     ImGui.End();
-                    ImGui.PopStyleColor(1);
+                    ImGui.PopStyleColor();
                     return;
                 }
 
                 ImGui.TextColored(new Vector4(0.5f, 1.0f, 0.0f, 1.0f),
                     " Editing Multiple Objects.\n Changes will be applied to all selected objects.");
                 ImGui.Separator();
-                ImGui.PushStyleColorVec4(ImGuiCol.FrameBg, new Vector4(0.0f, 0.5f, 0.0f, 0.1f));
+                ImGui.PushStyleColor(ImGuiCol.FrameBg, new Vector4(0.0f, 0.5f, 0.0f, 0.1f));
                 ImGui.BeginChild("MSB_EditingMultipleObjsChild");
                 PropEditorGeneric(selection, entSelection);
-                ImGui.PopStyleColor(1);
+                ImGui.PopStyleColor();
                 ImGui.EndChild();
             }
             else
@@ -1104,7 +1104,7 @@ public class PropertyEditor
                 ImGui.Text("Not all selected objects are the same type.");
                 ImGui.EndChild();
                 ImGui.End();
-                ImGui.PopStyleColor(1);
+                ImGui.PopStyleColor();
                 return;
             }
         }
@@ -1117,7 +1117,7 @@ public class PropertyEditor
                 ImGui.Text("Select a map object to edit its properties.");
                 ImGui.EndChild();
                 ImGui.End();
-                ImGui.PopStyleColor(1);
+                ImGui.PopStyleColor();
                 return;
             }
 
@@ -1137,7 +1137,7 @@ public class PropertyEditor
 
         ImGui.EndChild();
         ImGui.End();
-        ImGui.PopStyleColor(1);
+        ImGui.PopStyleColor();
     }
 
     internal enum RegionShape

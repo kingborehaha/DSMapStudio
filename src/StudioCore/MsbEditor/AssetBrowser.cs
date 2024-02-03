@@ -1,4 +1,4 @@
-﻿using static Andre.Native.ImGuiBindings;
+﻿using ImGuiNET;
 using System.Collections.Generic;
 
 namespace StudioCore.MsbEditor;
@@ -53,7 +53,7 @@ public class AssetBrowser
         }
     }
 
-    public unsafe void OnGui()
+    public void OnGui()
     {
         if (ImGui.Begin($@"Asset Browser##{_id}"))
         {
@@ -142,7 +142,7 @@ public class AssetBrowser
                         {
                         }
 
-                        if (ImGui.IsItemClicked(ImGuiMouseButton.Left) && ImGui.IsMouseDoubleClickedNil(0))
+                        if (ImGui.IsItemClicked() && ImGui.IsMouseDoubleClicked(0))
                         {
                             _handler.OnInstantiateChr(chr);
                         }
@@ -166,7 +166,7 @@ public class AssetBrowser
                         {
                         }
 
-                        if (ImGui.IsItemClicked(ImGuiMouseButton.Left) && ImGui.IsMouseDoubleClickedNil(0))
+                        if (ImGui.IsItemClicked() && ImGui.IsMouseDoubleClicked(0))
                         {
                             _handler.OnInstantiateObj(obj);
                         }
@@ -190,7 +190,7 @@ public class AssetBrowser
                         {
                         }
 
-                        if (ImGui.IsItemClicked(ImGuiMouseButton.Left) && ImGui.IsMouseDoubleClickedNil(0))
+                        if (ImGui.IsItemClicked() && ImGui.IsMouseDoubleClicked(0))
                         {
                             _handler.OnInstantiateParts(part);
                         }
@@ -216,7 +216,7 @@ public class AssetBrowser
                             {
                             }
 
-                            if (ImGui.IsItemClicked(ImGuiMouseButton.Left) && ImGui.IsMouseDoubleClickedNil(0))
+                            if (ImGui.IsItemClicked() && ImGui.IsMouseDoubleClicked(0))
                             {
                                 _handler.OnInstantiateMapPiece(_selected, model);
                             }

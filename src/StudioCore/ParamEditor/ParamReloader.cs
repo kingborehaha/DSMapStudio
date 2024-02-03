@@ -1,5 +1,5 @@
 ﻿using Andre.Formats;
-using static Andre.Native.ImGuiBindings;
+using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using ProcessMemoryUtilities.Managed;
 using ProcessMemoryUtilities.Native;

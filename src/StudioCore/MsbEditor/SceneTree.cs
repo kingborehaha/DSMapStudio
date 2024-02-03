@@ -1,4 +1,4 @@
-﻿using static Andre.Native.ImGuiBindings;
+﻿using ImGuiNET;
 using StudioCore.Editor;
 using StudioCore.Gui;
 using StudioCore.ParamEditor;
@@ -177,7 +177,7 @@ public class SceneTree : IActionEventHandler
             ImGui.SetNextItemWidth(100);
             if (_chaliceLoadError)
             {
-                ImGui.PushStyleColorVec4(ImGuiCol.FrameBg, new Vector4(0.8f, 0.2f, 0.2f, 1.0f));
+                ImGui.PushStyleColor(ImGuiCol.FrameBg, new Vector4(0.8f, 0.2f, 0.2f, 1.0f));
             }
 
             if (ImGui.InputText("##chalicename", ref pname, 12))
@@ -187,7 +187,7 @@ public class SceneTree : IActionEventHandler
 
             if (_chaliceLoadError)
             {
-                ImGui.PopStyleColor(1);
+                ImGui.PopStyleColor();
             }
 
             ImGui.SameLine();
@@ -242,7 +242,7 @@ public class SceneTree : IActionEventHandler
             }
 
             nodeopen = ImGui.TreeNodeEx(e.PrettyName, treeflags);
-            if (ImGui.IsItemHovered(0) && ImGui.IsMouseDoubleClickedNil(0))
+            if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(0))
             {
                 if (e.RenderSceneMesh != null)
                 {
@@ -255,10 +255,10 @@ public class SceneTree : IActionEventHandler
             _mapEnt_ImGuiID++;
             if (ImGui.Selectable(padding + e.PrettyName + "##" + _mapEnt_ImGuiID,
                     _selection.GetSelection().Contains(e),
-                    ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.AllowOverlap))
+                    ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.AllowItemOverlap))
             {
                 // If double clicked frame the selection in the viewport
-                if (ImGui.IsMouseDoubleClickedNil(0))
+                if (ImGui.IsMouseDoubleClicked(0))
                 {
                     if (e.RenderSceneMesh != null)
                     {
@@ -268,14 +268,14 @@ public class SceneTree : IActionEventHandler
             }
         }
 
-        if (ImGui.IsItemClicked())
+        if (ImGui.IsItemClicked(0))
         {
             _pendingClick = e;
         }
 
-        if (_pendingClick == e && ImGui.IsMouseReleasedNil(ImGuiMouseButton.Left))
+        if (_pendingClick == e && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
         {
-            if (ImGui.IsItemHovered(0))
+            if (ImGui.IsItemHovered())
             {
                 doSelect = true;
             }
@@ -323,7 +323,7 @@ public class SceneTree : IActionEventHandler
             ImGui.EndPopup();
         }
 
-        if (ImGui.BeginDragDropSource(0))
+        if (ImGui.BeginDragDropSource())
         {
             ImGui.Text(e.PrettyName);
             // Kinda meme
@@ -334,7 +334,7 @@ public class SceneTree : IActionEventHandler
             r.Index = _dragDropPayloadCounter;
             _dragDropPayloadCounter++;
             GCHandle handle = GCHandle.Alloc(r, GCHandleType.Pinned);
-            ImGui.SetDragDropPayload("entity", handle.AddrOfPinnedObject(), sizeof(DragDropPayloadReference));
+            ImGui.SetDragDropPayload("entity", handle.AddrOfPinnedObject(), (uint)sizeof(DragDropPayloadReference));
             ImGui.EndDragDropSource();
             handle.Free();
             _initiatedDragDrop = true;
@@ -342,10 +342,10 @@ public class SceneTree : IActionEventHandler
 
         if (hierarchial && ImGui.BeginDragDropTarget())
         {
-            ImGuiPayload *payload = ImGui.AcceptDragDropPayload("entity");
-            if (payload != null)
+            ImGuiPayloadPtr payload = ImGui.AcceptDragDropPayload("entity");
+            if (payload.NativePtr != null)
             {
-                var h = (DragDropPayloadReference*)payload->Data;
+                var h = (DragDropPayloadReference*)payload.Data;
                 DragDropPayload pload = _dragDropPayloads[h->Index];
                 _dragDropPayloads.Remove(h->Index);
                 _dragDropSources.Add(pload.Entity);
@@ -359,16 +359,16 @@ public class SceneTree : IActionEventHandler
         // Visibility icon
         if (visicon)
         {
-            ImGui.SetNextItemAllowOverlap();
+            ImGui.SetItemAllowOverlap();
             var visible = e.EditorVisible;
             ImGui.SameLine();
             ImGui.SetCursorPosX(ImGui.GetWindowContentRegionMax().X - (18.0f * MapStudioNew.GetUIScale()));
-            ImGui.PushStyleColorVec4(ImGuiCol.Text, visible
+            ImGui.PushStyleColor(ImGuiCol.Text, visible
                 ? new Vector4(1.0f, 1.0f, 1.0f, 1.0f)
                 : new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
             ImGui.TextWrapped(visible ? ForkAwesome.Eye : ForkAwesome.EyeSlash);
-            ImGui.PopStyleColor(1);
-            if (ImGui.IsItemClicked())
+            ImGui.PopStyleColor();
+            if (ImGui.IsItemClicked(0))
             {
                 e.EditorVisible = !e.EditorVisible;
                 doSelect = false;
@@ -383,12 +383,12 @@ public class SceneTree : IActionEventHandler
         {
             if (e is MapEntity me2)
             {
-                ImGui.SetNextItemAllowOverlap();
+                ImGui.SetItemAllowOverlap();
                 ImGui.InvisibleButton(me2.Type + e.Name, new Vector2(-1, 3.0f) * scale);
             }
             else
             {
-                ImGui.SetNextItemAllowOverlap();
+                ImGui.SetItemAllowOverlap();
                 ImGui.InvisibleButton(e.Name, new Vector2(-1, 3.0f) * scale);
             }
 
@@ -399,10 +399,10 @@ public class SceneTree : IActionEventHandler
 
             if (ImGui.BeginDragDropTarget())
             {
-                ImGuiPayload *payload = ImGui.AcceptDragDropPayload("entity");
-                if (payload != null) //todo: never passes
+                ImGuiPayloadPtr payload = ImGui.AcceptDragDropPayload("entity");
+                if (payload.NativePtr != null) //todo: never passes
                 {
-                    var h = (DragDropPayloadReference*)payload->Data;
+                    var h = (DragDropPayloadReference*)payload.Data;
                     DragDropPayload pload = _dragDropPayloads[h->Index];
                     _dragDropPayloads.Remove(h->Index);
                     if (hierarchial)
@@ -492,17 +492,17 @@ public class SceneTree : IActionEventHandler
                                     if (ImGui.TreeNodeEx($"{typ.Key.Name} {parentAD.AssetName}",
                                             ImGuiTreeNodeFlags.OpenOnArrow))
                                     {
-                                        ImGui.SetNextItemAllowOverlap();
+                                        ImGui.SetItemAllowOverlap();
                                         var visible = parent.EditorVisible;
                                         ImGui.SameLine();
                                         ImGui.SetCursorPosX(ImGui.GetWindowContentRegionMax().X -
                                                             (18.0f * MapStudioNew.GetUIScale()));
-                                        ImGui.PushStyleColorVec4(ImGuiCol.Text, visible
+                                        ImGui.PushStyleColor(ImGuiCol.Text, visible
                                             ? new Vector4(1.0f, 1.0f, 1.0f, 1.0f)
                                             : new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
                                         ImGui.TextWrapped(visible ? ForkAwesome.Eye : ForkAwesome.EyeSlash);
-                                        ImGui.PopStyleColor(1);
-                                        if (ImGui.IsItemClicked())
+                                        ImGui.PopStyleColor();
+                                        if (ImGui.IsItemClicked(0))
                                         {
                                             // Hide/Unhide all lights within this BTL.
                                             parent.EditorVisible = !parent.EditorVisible;
@@ -517,17 +517,17 @@ public class SceneTree : IActionEventHandler
                                     }
                                     else
                                     {
-                                        ImGui.SetNextItemAllowOverlap();
+                                        ImGui.SetItemAllowOverlap();
                                         var visible = parent.EditorVisible;
                                         ImGui.SameLine();
                                         ImGui.SetCursorPosX(ImGui.GetWindowContentRegionMax().X -
                                                             (18.0f * MapStudioNew.GetUIScale()));
-                                        ImGui.PushStyleColorVec4(ImGuiCol.Text, visible
+                                        ImGui.PushStyleColor(ImGuiCol.Text, visible
                                             ? new Vector4(1.0f, 1.0f, 1.0f, 1.0f)
                                             : new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
                                         ImGui.TextWrapped(visible ? ForkAwesome.Eye : ForkAwesome.EyeSlash);
-                                        ImGui.PopStyleColor(1);
-                                        if (ImGui.IsItemClicked())
+                                        ImGui.PopStyleColor();
+                                        if (ImGui.IsItemClicked(0))
                                         {
                                             // Hide/Unhide all lights within this BTL.
                                             parent.EditorVisible = !parent.EditorVisible;
@@ -561,18 +561,18 @@ public class SceneTree : IActionEventHandler
         }
     }
 
-    public unsafe void OnGui()
+    public void OnGui()
     {
         var scale = MapStudioNew.GetUIScale();
 
-        ImGui.PushStyleColorVec4(ImGuiCol.ChildBg, new Vector4(0.145f, 0.145f, 0.149f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, new Vector4(0.145f, 0.145f, 0.149f, 1.0f));
         if (_configuration == Configuration.MapEditor)
         {
-            ImGui.PushStyleVarVec2(ImGuiStyleVar.WindowPadding, new Vector2(0.0f, 0.0f));
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(0.0f, 0.0f));
         }
         else
         {
-            ImGui.PushStyleVarVec2(ImGuiStyleVar.WindowPadding, new Vector2(0.0f, 2.0f) * scale);
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(0.0f, 2.0f) * scale);
         }
 
         var titleString = _configuration == Configuration.MapEditor
@@ -586,19 +586,19 @@ public class SceneTree : IActionEventHandler
                 _pendingDragDrop = true;
             }
 
-            if (_pendingDragDrop && ImGui.IsMouseReleasedNil(ImGuiMouseButton.Left))
+            if (_pendingDragDrop && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
             {
                 _pendingDragDrop = false;
             }
 
-            ImGui.PopStyleVar(1);
+            ImGui.PopStyleVar();
 
             if (MapStudioNew.LowRequirementsMode)
             {
                 ImGui.NewLine();
                 ImGui.Text("  This editor is not available in low requirements mode.");
                 ImGui.End();
-                ImGui.PopStyleColor(1);
+                ImGui.PopStyleColor();
                 return;
             }
 
@@ -611,7 +611,7 @@ public class SceneTree : IActionEventHandler
                         ImGui.NewLine();
                         ImGui.Text("  Please wait for params to finish loading.");
                         ImGui.End();
-                        ImGui.PopStyleColor(1);
+                        ImGui.PopStyleColor();
                         return;
                     }
                 }
@@ -718,7 +718,7 @@ public class SceneTree : IActionEventHandler
                 if (metaName != "")
                 {
                     ImGui.SameLine();
-                    ImGui.PushTextWrapPos(0.0f);
+                    ImGui.PushTextWrapPos();
                     if (metaName.StartsWith("--")) // Marked as normally unused (use red text)
                     {
                         ImGui.TextColored(new Vector4(1.0f, 0.0f, 0.0f, 1.0f), @$"<{metaName.Replace("--", "")}>");
@@ -830,15 +830,15 @@ public class SceneTree : IActionEventHandler
                     _pendingClick = selectTarget;
                 }
 
-                if (ImGui.IsMouseDoubleClickedNil(0) && _pendingClick != null && mapRoot == _pendingClick)
+                if (ImGui.IsMouseDoubleClicked(0) && _pendingClick != null && mapRoot == _pendingClick)
                 {
                     _viewport.FramePosition(mapRoot.GetLocalTransform().Position, 10f);
                 }
 
                 if ((_pendingClick == mapRoot || mapRef.Equals(_pendingClick)) &&
-                    ImGui.IsMouseReleasedNil(ImGuiMouseButton.Left))
+                    ImGui.IsMouseReleased(ImGuiMouseButton.Left))
                 {
-                    if (ImGui.IsItemHovered(0))
+                    if (ImGui.IsItemHovered())
                     {
                         // Only select if a node is not currently being opened/closed
                         if (mapRoot == null ||
@@ -885,11 +885,11 @@ public class SceneTree : IActionEventHandler
                 {
                     if (_pendingDragDrop)
                     {
-                        ImGui.PushStyleVarVec2(ImGuiStyleVar.ItemSpacing, new Vector2(8.0f, 0.0f) * scale);
+                        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8.0f, 0.0f) * scale);
                     }
                     else
                     {
-                        ImGui.PushStyleVarVec2(ImGuiStyleVar.ItemSpacing, new Vector2(8.0f, 3.0f) * scale);
+                        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8.0f, 3.0f) * scale);
                     }
 
                     if (_viewMode == ViewMode.Hierarchy)
@@ -905,7 +905,7 @@ public class SceneTree : IActionEventHandler
                         TypeView((Map)map);
                     }
 
-                    ImGui.PopStyleVar(1);
+                    ImGui.PopStyleVar();
                     ImGui.TreePop();
                 }
 
@@ -951,11 +951,11 @@ public class SceneTree : IActionEventHandler
         }
         else
         {
-            ImGui.PopStyleVar(1);
+            ImGui.PopStyleVar();
         }
 
         ImGui.End();
-        ImGui.PopStyleColor(1);
+        ImGui.PopStyleColor();
         _selection.ClearGotoTarget();
     }
 }
