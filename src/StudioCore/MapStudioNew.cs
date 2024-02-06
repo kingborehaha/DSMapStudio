@@ -303,6 +303,8 @@ public class MapStudioNew
         }
     }
 
+    private float _frameTime = 60.0f;
+
     public void Run()
     {
         SetupCSharpDefaults();
@@ -332,13 +334,14 @@ public class MapStudioNew
 
             // Limit frame rate when window isn't focused unless we are profiling
             var focused = Tracy.EnableTracy ? true : _context.Window.Focused;
+
             if (!focused)
             {
                 _desiredFrameLengthSeconds = 1.0 / 20.0f;
             }
             else
             {
-                _desiredFrameLengthSeconds = 1.0 / 60.0f;
+                _desiredFrameLengthSeconds = 1.0 / _frameTime;
             }
 
             var currentFrameTicks = sw.ElapsedTicks;
@@ -778,6 +781,8 @@ public class MapStudioNew
         {
             if (ImGui.BeginMenu("File"))
             {
+                ImGui.DragFloat("Frame time", ref _frameTime, 10, 20, 900);
+
                 if (ImGui.MenuItem("Enable Texturing (alpha)", "", CFG.Current.EnableTexturing))
                 {
                     CFG.Current.EnableTexturing = !CFG.Current.EnableTexturing;
